@@ -50,14 +50,20 @@ class ConsoleSink(BaseSink):
 class SQLiteSink(BaseSink):
     """Sink that persists cost events to a local SQLite database."""
 
-    def __init__(self, path: str | Path = "veritas_events.db"):
+    def __init__(self, path: str | Path | None = None):
         """Initialize the sink with a DB path.
 
         Args:
             path: Path to the SQLite file. Use ":memory:" for an in-memory DB
-                  (useful for tests).
+                  (useful for tests). If None, defaults to VERITAS_DB_PATH env var
+                  or 'veritas_events.db'.
         """
-        self._path = str(path)
+        if path is None:
+            import os
+            self._path = os.environ.get("VERITAS_DB_PATH", "veritas_events.db")
+        else:
+            self._path = str(path)
+            
         self._conn = sqlite3.connect(self._path)
         self._conn.execute(EVENTS_SCHEMA)
         self._conn.commit()
