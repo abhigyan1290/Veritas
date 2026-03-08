@@ -1,0 +1,3 @@
+usage_date_utc,model,workspace,api_key,usage_type,context_window,token_type,cost_usd,cost_type,inference_geo,speed
+2026-03-06,Claude Sonnet 4,Default,vit-test,message,≤ 200k,input_no_cache,0.00,token,not_available,
+2026-03-06,Claude Sonnet 4,Default,vit-test,message,≤ 200k,output,0.01,token,not_available,

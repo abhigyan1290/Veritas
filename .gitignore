@@ -1,0 +1,26 @@
+# API keys and secrets (never commit)
+.env
+.env.local
+.anthropic_key
+*.key
+secrets.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+.pytest_cache/
+*.db
+sample_events.db
+schema_and_sample.txt
+validation_events.db
+validation_logs/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo

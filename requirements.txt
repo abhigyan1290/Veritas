@@ -1,0 +1,9 @@
+# Veritas Core Dependencies
+# Core package has no external dependencies beyond the standard library
+
+# Test Dependencies
+pytest>=7.0
+pytest-asyncio>=0.21
+
+# Example Dependencies
+anthropic>=0.39
