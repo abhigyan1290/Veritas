@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="mb-8">
+    <h2 class="text-3xl font-extrabold text-gray-900">Regression Feed</h2>
+    <p class="text-gray-500 mt-1">Cost spikes detected for <span class="font-semibold">{{ project_id }}</span></p>
+</div>
+
+<div class="space-y-6">
+    {% for reg in regressions %}
+    <div class="bg-white rounded-lg shadow-sm border {% if reg.is_regression %}border-red-300{% else %}border-gray-200{% endif %} overflow-hidden pl-2 flex flex-col">
+        <div class="{% if reg.is_regression %}bg-red-50{% else %}bg-gray-50{% endif %} px-6 py-4 flex justify-between items-center border-b border-gray-100">
+            <div>
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {% if reg.is_regression %}bg-red-100 text-red-800{% else %}bg-green-100 text-green-800{% endif %}">
+                    {% if reg.is_regression %}Regression Detected{% else %}OK{% endif %}
+                </span>
+                <span class="ml-3 font-semibold text-gray-800">Feature: <a href="/features/{{ reg.feature }}?project_id={{ project_id }}" class="text-blue-600 hover:underline">{{ reg.feature }}</a></span>
+            </div>
+            <div class="text-sm font-mono bg-gray-200 text-gray-600 px-3 py-1 rounded">
+                {{ reg.commit_a }} &rarr; {{ reg.commit_b }}
+            </div>
+        </div>
+        
+        <div class="p-6 grid grid-cols-1 md:grid-cols-3 gap-4 bg-white">
+            <div>
+                <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Base Cost ({{ reg.commit_a }})</p>
+                <p class="mt-1 text-2xl font-bold text-gray-700">${{ "%.4f"|format(reg.avg_cost_a) }}</p>
+            </div>
+            <div>
+                <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">New Cost ({{ reg.commit_b }})</p>
+                <p class="mt-1 text-2xl font-bold {% if reg.is_regression %}text-red-600{% else %}text-gray-700{% endif %}">${{ "%.4f"|format(reg.avg_cost_b) }}</p>
+            </div>
+            <div>
+                <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Delta</p>
+                <div class="mt-1 flex items-center gap-2">
+                    <p class="text-2xl font-black {% if reg.is_regression %}text-red-600{% else %}text-gray-700{% endif %}">+${{ "%.4f"|format(reg.delta) }}</p>
+                    {% if reg.is_regression %}
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-sm font-bold bg-red-100 text-red-800 border border-red-200 shadow-sm animate-bounce">
+                        +{{ "%.0f"|format(reg.percent_change) }}% Spike
+                    </span>
+                    {% else %}
+                    <span class="text-sm font-medium text-gray-500">({{ "%.1f"|format(reg.percent_change) }}%)</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-10 text-center">
+        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <h3 class="mt-2 text-sm font-medium text-gray-900">No Regressions</h3>
+        <p class="mt-1 text-sm text-gray-500">All features are running within standard cost limits.</p>
+    </div>
+    {% endfor %}
+</div>
+
+{% endblock %}
