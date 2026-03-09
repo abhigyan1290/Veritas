@@ -1,45 +1,26 @@
-# Environments
+# API keys and secrets (never commit)
 .env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
+.env.local
+.anthropic_key
+*.key
+secrets.env
 
-# Byte-compiled / optimized / DLL files
+# Python
 __pycache__/
 *.py[cod]
-*$py.class
-
-# Databases
-*.sqlite3
-*.db
-veritas_events.db
-
-# OS generated files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-
-# Build/distribution
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
 *.egg-info/
-.installed.cfg
-*.egg
+.eggs/
+dist/
+build/
+.pytest_cache/
+*.db
+sample_events.db
+schema_and_sample.txt
+validation_events.db
+validation_logs/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo

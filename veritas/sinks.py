@@ -2,11 +2,6 @@
 
 import json
 import sqlite3
-import os
-import atexit
-import threading
-import urllib.request
-import urllib.error
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -134,64 +129,3 @@ class SQLiteSink(BaseSink):
     def close(self) -> None:
         """Close the database connection. Call when done emitting events."""
         self._conn.close()
-
-class HttpSink(BaseSink):
-    """Sink that buffers cost events and POSTs them to a Cloud Ingestion API."""
-
-    def __init__(self, api_url: str | None = None, api_key: str | None = None, batch_size: int = 10):
-        self._buffer: list = []
-        self._batch_size = batch_size
-        self._lock = threading.Lock()
-        
-        # Configuration
-        self._api_url = api_url or os.environ.get("VERITAS_API_URL", "http://localhost:8000/api/v1/events")
-        self._api_key = api_key or os.environ.get("VERITAS_API_KEY")
-        
-        # Note: atexit flush is best-effort; events may be lost on SIGKILL or OOM kill.
-        atexit.register(self.flush)
-
-    def emit(self, event: "CostEvent") -> None:
-        """Buffer the event, and flush if batch size is reached."""
-        with self._lock:
-            self._buffer.append(event.to_dict())
-            if len(self._buffer) >= self._batch_size:
-                events_to_flush = self._buffer[:]
-                self._buffer.clear()
-            else:
-                events_to_flush = None
-                
-        if events_to_flush:
-            self._send_batch(events_to_flush)
-
-    def flush(self) -> None:
-        """Flush any remaining events in the buffer. Fired automatically on process exit."""
-        with self._lock:
-            events_to_flush = self._buffer[:]
-            self._buffer.clear()
-            
-        if events_to_flush:
-            self._send_batch(events_to_flush)
-
-    def _send_batch(self, events: list[dict]) -> None:
-        """Internal method to POST events to the configured Cloud Ingestion API."""
-        if not self._api_key:
-            return  # Fail silently if misconfigured to protect the calling app
-            
-        try:
-            req = urllib.request.Request(
-                self._api_url,
-                data=json.dumps(events).encode("utf-8"),
-                headers={
-                    "Content-Type": "application/json",
-                    "Authorization": f"Bearer {self._api_key}"
-                },
-                method="POST"
-            )
-            # 5-second timeout. We fail silently on network errors so we never break CI.
-            with urllib.request.urlopen(req, timeout=5) as response:
-                pass
-        except Exception as e:
-            # Swallow all exceptions (timeouts, 5xx, DNS errors).
-            # We log a warning to stdout so developers can debug configuration issues.
-            print(f"Veritas Warning: Failed to flush {len(events)} events to Cloud API: {e}")
-
