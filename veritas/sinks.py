@@ -129,3 +129,34 @@ class SQLiteSink(BaseSink):
     def close(self) -> None:
         """Close the database connection. Call when done emitting events."""
         self._conn.close()
+
+
+class HttpSink(BaseSink):
+    """Sink that transmits cost events via HTTP POST to a centralized Veritas server."""
+    
+    def __init__(self, endpoint_url: str, api_key: str):
+        self.endpoint_url = endpoint_url
+        self.api_key = api_key
+        # We use a memory buffer to batch events in real production,
+        # but for this demo phase we dispatch synchronously to prove flow.
+        import requests
+        self._session = requests.Session()
+        self._session.headers.update({
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        })
+        
+    def emit(self, event: "CostEvent") -> None:
+        """Send the event directly to the centralized server."""
+        try:
+            # We enforce a fast timeout since this handles live traffic
+            response = self._session.post(
+                self.endpoint_url, 
+                json=event.to_dict(), 
+                timeout=2.0
+            )
+            # We explicitly ignore non-200 responses right now to prevent 
+            # the SDK from crashing the host application.
+        except Exception:
+            # Fail silently to prevent crashing the host application
+            pass

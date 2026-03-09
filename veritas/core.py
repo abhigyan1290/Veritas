@@ -7,7 +7,7 @@ from typing import Callable, Optional, TypeVar
 
 from veritas.pricing import compute_cost
 from veritas.sinks import BaseSink, ConsoleSink
-from veritas.utils import get_git_commit_hash, utc_now_iso
+from veritas.utils import get_current_commit_hash, utc_now_iso
 
 F = TypeVar("F")
 
@@ -129,7 +129,7 @@ def track(
                     cache_read_tokens=cache_read_tokens,
                     latency_ms=round(latency_ms, 2),
                     cost_usd=cost_usd,
-                    code_version=get_git_commit_hash(),
+                    code_version=get_current_commit_hash(),
                     timestamp=utc_now_iso(),
                     status="ok",
                     estimated=estimated,
@@ -148,7 +148,7 @@ def track(
                     cache_read_tokens=0,
                     latency_ms=round(latency_ms, 2),
                     cost_usd=0.0,
-                    code_version=get_git_commit_hash(),
+                    code_version=get_current_commit_hash(),
                     timestamp=utc_now_iso(),
                     status="error",
                     estimated=True,
@@ -165,3 +165,7 @@ def set_default_sink(sink: BaseSink) -> None:
     """Set the default sink for @track when no sink is passed."""
     global _default_sink
     _default_sink = sink
+
+def get_default_sink() -> BaseSink:
+    """Return the currently configured sink."""
+    return _default_sink
