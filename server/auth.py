@@ -36,10 +36,6 @@ def verify_api_key(credentials: HTTPAuthorizationCredentials = Security(security
         project = db.query(Project).filter(Project.api_key_hash == token_hash).first()
         
         if not project:
-            # Special bypass for the local demo app
-            if token == os.environ.get("VERITAS_API_KEY", "sk-vrt-demo-local"):
-                # We mock a project ID for the demo if it hits this fallback
-                return "beach_app"
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Invalid or missing API Key"

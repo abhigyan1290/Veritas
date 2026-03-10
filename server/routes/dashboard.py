@@ -9,7 +9,6 @@ from datetime import datetime, timezone
 
 from server.database import get_db
 from server.models import Project, Event
-from server.auth import verify_admin
 from server.demo_tenant import ensure_demo_tenant
 import json
 from typing import Optional
@@ -17,21 +16,25 @@ from typing import Optional
 router = APIRouter()
 templates = Jinja2Templates(directory="server/templates")
 
-def get_projects(db: Session):
-    return db.query(Project).all()
+def get_projects(db: Session, user_id: str):
+    return db.query(Project).filter(Project.user_id == user_id).all()
 
 @router.get("/", response_class=HTMLResponse)
 def dashboard(
     request: Request,
     project_id: str = "demo",
-    username: str = Depends(verify_admin),
     db: Session = Depends(get_db)
 ):
     ensure_demo_tenant(db)
+    current_user = request.state.current_user
         
-    projects = get_projects(db)
+    projects = get_projects(db, current_user.id)
         
-    events_query = db.query(Event).filter(Event.project_id == project_id)
+    events_query = (
+        db.query(Event)
+        .join(Project, Event.project_id == Project.id)
+        .filter(Project.user_id == current_user.id, Event.project_id == project_id)
+    )
     total_events = events_query.count()
     total_cost = events_query.with_entities(func.sum(Event.cost_usd)).scalar() or 0.0
     total_tokens = events_query.with_entities(func.sum(Event.tokens_in + Event.tokens_out)).scalar() or 0
@@ -41,7 +44,8 @@ def dashboard(
 
     commit_rows = (
         db.query(Event.code_version, func.avg(Event.cost_usd).label("avg_cost"))
-        .filter(Event.project_id == project_id, Event.code_version != None, Event.code_version != "")
+        .join(Project, Event.project_id == Project.id)
+        .filter(Project.user_id == current_user.id, Event.project_id == project_id, Event.code_version != None, Event.code_version != "")
         .group_by(Event.code_version)
         .order_by(func.max(Event.timestamp).asc())
         .all()
@@ -62,6 +66,7 @@ def dashboard(
             "avg_latency": avg_latency,
             "events": recent_events,
             "chart_data": chart_data,
+            "user": current_user,
         }
     )
 
@@ -70,12 +75,16 @@ def feature_breakdown(
     request: Request,
     name: str,
     project_id: str = "demo",
-    username: str = Depends(verify_admin),
     db: Session = Depends(get_db)
 ):
-    projects = get_projects(db)
+    current_user = request.state.current_user
+    projects = get_projects(db, current_user.id)
     
-    events_query = db.query(Event).filter(Event.project_id == project_id, Event.feature == name)
+    events_query = (
+        db.query(Event)
+        .join(Project, Event.project_id == Project.id)
+        .filter(Project.user_id == current_user.id, Event.project_id == project_id, Event.feature == name)
+    )
     avg_cost = events_query.with_entities(func.avg(Event.cost_usd)).scalar() or 0.0
     total_cost = events_query.with_entities(func.sum(Event.cost_usd)).scalar() or 0.0
     events = events_query.order_by(Event.timestamp.desc()).limit(50).all()
@@ -89,7 +98,8 @@ def feature_breakdown(
             "feature_name": name,
             "avg_cost": avg_cost,
             "total_cost": total_cost,
-            "events": events
+            "events": events,
+            "user": current_user,
         }
     )
 
@@ -97,16 +107,17 @@ def feature_breakdown(
 def regressions(
     request: Request,
     project_id: str = "demo",
-    username: str = Depends(verify_admin),
     db: Session = Depends(get_db)
 ):
-    projects = get_projects(db)
+    current_user = request.state.current_user
+    projects = get_projects(db, current_user.id)
     
     # Get distinct commits ordered by the MOST RECENT event timestamp for that commit.
     # This ensures latest = the newest commit, previous = the one before it.
     commit_rows = (
         db.query(Event.code_version, func.max(Event.timestamp).label("last_seen"))
-        .filter(Event.project_id == project_id, Event.code_version != None, Event.code_version != "")
+        .join(Project, Event.project_id == Project.id)
+        .filter(Project.user_id == current_user.id, Event.project_id == project_id, Event.code_version != None, Event.code_version != "")
         .group_by(Event.code_version)
         .order_by(func.max(Event.timestamp).asc())
         .all()
@@ -118,11 +129,27 @@ def regressions(
         previous = commits[-2]   # second-most-recent commit
         latest = commits[-1]     # most recent commit
         
-        features = [r[0] for r in db.query(Event.feature).filter(Event.project_id == project_id).distinct().all()]
+        features = [r[0] for r in (
+            db.query(Event.feature)
+            .join(Project, Event.project_id == Project.id)
+            .filter(Project.user_id == current_user.id, Event.project_id == project_id)
+            .distinct()
+            .all()
+        )]
         
         for feature in features:
-            latest_avg = db.query(func.avg(Event.cost_usd)).filter(Event.project_id == project_id, Event.code_version == latest, Event.feature == feature).scalar() or 0.0
-            prev_avg = db.query(func.avg(Event.cost_usd)).filter(Event.project_id == project_id, Event.code_version == previous, Event.feature == feature).scalar() or 0.0
+            latest_avg = (
+                db.query(func.avg(Event.cost_usd))
+                .join(Project, Event.project_id == Project.id)
+                .filter(Project.user_id == current_user.id, Event.project_id == project_id, Event.code_version == latest, Event.feature == feature)
+                .scalar() or 0.0
+            )
+            prev_avg = (
+                db.query(func.avg(Event.cost_usd))
+                .join(Project, Event.project_id == Project.id)
+                .filter(Project.user_id == current_user.id, Event.project_id == project_id, Event.code_version == previous, Event.feature == feature)
+                .scalar() or 0.0
+            )
             
             diff = latest_avg - prev_avg
             diff_pct = ((diff / prev_avg) * 100) if prev_avg > 0 else 0
@@ -147,7 +174,8 @@ def regressions(
             "project_id": project_id,
             "projects": projects,
             "commits": commits,
-            "insights": insights
+            "insights": insights,
+            "user": current_user,
         }
     )
 
@@ -156,29 +184,32 @@ def settings_page(
     request: Request,
     project_id: str = "demo",
     raw_key: Optional[str] = None,
-    username: str = Depends(verify_admin),
     db: Session = Depends(get_db)
 ):
-    projects = get_projects(db)
+    current_user = request.state.current_user
+    projects = get_projects(db, current_user.id)
     return templates.TemplateResponse(
         "settings.html",
         {
             "request": request,
             "project_id": project_id,
             "projects": projects,
-            "raw_key": raw_key
+            "raw_key": raw_key,
+            "user": current_user,
         }
     )
 
 @router.post("/settings/project/new")
 def form_create_project(
+    request: Request,
     project_name: str = Form(...),
-    username: str = Depends(verify_admin),
     db: Session = Depends(get_db)
 ):
     from server.routes.ingest import create_project
     from server.schemas import ProjectCreateSchema
-    result = create_project(ProjectCreateSchema(name=project_name), db=db)
+    
+    current_user = request.state.current_user
+    result = create_project(ProjectCreateSchema(name=project_name), db=db, user_id=current_user.id)
     
     return RedirectResponse(
         url=f"/settings?project_id={result['id']}&raw_key={result['raw_key']}", 

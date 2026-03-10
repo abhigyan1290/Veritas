@@ -80,9 +80,12 @@
             </div>
             <div class="flex items-center gap-3">
                 <span class="text-xs mono text-slate-400 bg-slate-100 border border-slate-200 px-2 py-1 rounded-md">{{ project_id }}</span>
-                <div class="w-7 h-7 rounded-full bg-indigo-600 flex items-center justify-center">
-                    <span class="text-xs font-bold text-white">A</span>
+                <div class="w-7 h-7 rounded-full bg-indigo-600 flex items-center justify-center" title="{{ user.email if user else '' }}">
+                    <span class="text-xs font-bold text-white">{{ user.email[0]|upper if user else 'U' }}</span>
                 </div>
+                <form action="/auth/logout" method="POST" class="ml-2 m-0 flex">
+                    <button type="submit" class="text-xs font-semibold text-slate-400 hover:text-red-500 transition-colors">Logout</button>
+                </form>
             </div>
         </header>
 

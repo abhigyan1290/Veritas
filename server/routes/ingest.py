@@ -60,7 +60,7 @@ def ingest_event(
 
 
 @router.post("/projects", response_model=ProjectSettingResponse)
-def create_project(data: ProjectCreateSchema, db: Session = Depends(get_db)):
+def create_project(data: ProjectCreateSchema, db: Session = Depends(get_db), user_id: str = None):
     """
     Create a new project workspace and generate an API key.
     Returns the raw API key EXACTLY ONCE.
@@ -76,7 +76,8 @@ def create_project(data: ProjectCreateSchema, db: Session = Depends(get_db)):
         id=project_id,
         name=data.name,
         created_at=datetime.now(timezone.utc),
-        api_key_hash=api_key_hash
+        api_key_hash=api_key_hash,
+        user_id=user_id
     )
     try:
         db.add(db_project)

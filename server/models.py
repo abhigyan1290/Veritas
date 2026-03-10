@@ -1,5 +1,17 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey
+from sqlalchemy.orm import relationship
+import uuid
+from datetime import datetime, timezone
 from server.database import Base
+
+class User(Base):
+    __tablename__ = "users"
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    email = Column(String, unique=True, nullable=False, index=True)
+    password_hash = Column(String, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    
+    projects = relationship("Project", back_populates="owner")
 
 class Project(Base):
     """A developer project that consumes Veritas"""
@@ -10,6 +22,9 @@ class Project(Base):
     created_at = Column(DateTime)
     # The developer's hashed API Key for authentication
     api_key_hash = Column(String, nullable=False, default="")
+    user_id = Column(String, ForeignKey("users.id"), nullable=True) # nullable=True for backward compat
+    
+    owner = relationship("User", back_populates="projects")
 
 class Event(Base):
     """The central unified table for all cost events"""
