@@ -7,8 +7,8 @@ import hashlib
 from server.models import Project, Event, User
 from server.auth_users import hash_password
 
-DEMO_EMAIL = "demo@veritas.dev"
-DEMO_PASSWORD = os.environ.get("VERITAS_DEMO_PASS", "veritas-demo-2024")
+DEMO_USERNAME = "admin"
+DEMO_PASSWORD = os.environ.get("VERITAS_DEMO_PASS", "claudecode")
 
 def generate_demo_traffic(db: Session, project_id: str):
     """Seed the database with realistically chronological API calls - REMOVED PER USER REQUEST"""
@@ -16,10 +16,10 @@ def generate_demo_traffic(db: Session, project_id: str):
 
 def ensure_demo_tenant(db: Session):
     """Ensure the static demo tenant exists and has a real user"""
-    user = db.query(User).filter(User.email == DEMO_EMAIL).first()
+    user = db.query(User).filter(User.username == DEMO_USERNAME).first()
     if not user:
         user = User(
-            email=DEMO_EMAIL,
+            username=DEMO_USERNAME,
             password_hash=hash_password(DEMO_PASSWORD),
             created_at=datetime.now(timezone.utc)
         )

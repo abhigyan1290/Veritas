@@ -19,8 +19,8 @@ def login_page(request: Request, error: str = None):
     return templates.TemplateResponse("login.html", {"request": request, "error": error})
 
 @router.post("/auth/login")
-def login(response: Response, email: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == email).first()
+def login(response: Response, username: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == username).first()
     if not user or not verify_password(password, user.password_hash):
         return RedirectResponse(url="/auth/login?error=Invalid+credentials", status_code=303)
         
@@ -37,16 +37,16 @@ def signup_page(request: Request, error: str = None):
     )
 
 @router.post("/auth/signup")
-def signup(response: Response, email: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
+def signup(response: Response, username: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
     if not ALLOW_SIGNUPS:
         return RedirectResponse(url="/auth/signup?error=Signups+are+invite-only", status_code=303)
         
-    existing_user = db.query(User).filter(User.email == email).first()
+    existing_user = db.query(User).filter(User.username == username).first()
     if existing_user:
-        return RedirectResponse(url="/auth/signup?error=Email+already+exists", status_code=303)
+        return RedirectResponse(url="/auth/signup?error=Username+already+exists", status_code=303)
         
     new_user = User(
-        email=email,
+        username=username,
         password_hash=hash_password(password),
         created_at=datetime.now(timezone.utc)
     )

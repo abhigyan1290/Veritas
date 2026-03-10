@@ -23,7 +23,7 @@ def db():
 
 def test_user_a_cannot_see_user_b_events(client, db):
     # Setup User A
-    user_a = User(email="a@test.com", password_hash=hash_password("test"))
+    user_a = User(username="a_test", password_hash=hash_password("test"))
     db.add(user_a)
     db.commit()
     token_a = create_session_token(user_a.id)
@@ -62,7 +62,7 @@ def test_user_a_cannot_see_user_b_events(client, db):
     assert "search_a" in dash_a.text
     
     # Setup User B
-    user_b = User(email="b@test.com", password_hash=hash_password("test"))
+    user_b = User(username="b_test", password_hash=hash_password("test"))
     db.add(user_b)
     db.commit()
     token_b = create_session_token(user_b.id)
