@@ -149,14 +149,11 @@ class HttpSink(BaseSink):
     def emit(self, event: "CostEvent") -> None:
         """Send the event directly to the centralized server."""
         try:
-            # We enforce a fast timeout since this handles live traffic
             response = self._session.post(
                 self.endpoint_url, 
                 json=event.to_dict(), 
                 timeout=2.0
             )
-            # We explicitly ignore non-200 responses right now to prevent 
-            # the SDK from crashing the host application.
         except Exception:
-            # Fail silently to prevent crashing the host application
+            # Fail silently — never crash the host application due to telemetry errors.
             pass

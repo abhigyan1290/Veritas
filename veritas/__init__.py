@@ -6,6 +6,7 @@ from veritas.core import CostEvent, track, set_default_sink, get_default_sink
 from veritas.sinks import BaseSink, ConsoleSink, SQLiteSink, HttpSink
 from veritas.utils import get_current_commit_hash, utc_now_iso
 from veritas.client import Anthropic
+from veritas.openai_client import OpenAI
 
 __all__ = [
     "__version__",
@@ -19,7 +20,8 @@ __all__ = [
     "HttpSink",
     "get_current_commit_hash",
     "utc_now_iso",
-    "Anthropic"
+    "Anthropic",
+    "OpenAI",
 ]
 
 # Auto-configure the default sink if environment variables are present

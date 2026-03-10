@@ -1,26 +1,22 @@
-# API keys and secrets (never commit)
+# Virtual environments
+venv/
+env/
 .env
-.env.local
-.anthropic_key
-*.key
-secrets.env
+.venv/
 
-# Python
+# Python cache
 __pycache__/
 *.py[cod]
+*$py.class
+
+# Veritas Local DB
+*.db
+*.db-journal
+veritas_cloud.db
+
+# Misc
+.pytest_cache/
 *.egg-info/
-.eggs/
 dist/
 build/
-.pytest_cache/
-*.db
-sample_events.db
-schema_and_sample.txt
-validation_events.db
-validation_logs/
-
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
+.DS_Store

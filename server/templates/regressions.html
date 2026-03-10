@@ -1,101 +1,103 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Regressions - Veritas Cloud</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        body { font-family: 'Inter', sans-serif; }
-    </style>
-</head>
-<body class="bg-gray-50 min-h-screen">
-    <nav class="bg-white border-b border-gray-200">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-16">
-                <div class="flex items-center">
-                    <span class="text-2xl font-black text-indigo-600 tracking-tighter">veritas</span>
-                    <div class="hidden md:ml-6 md:flex md:space-x-8">
-                        <a href="/" class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">Dashboard</a>
-                        <a href="/regressions" class="border-indigo-500 text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">Regressions</a>
-                        <a href="/settings" class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">Settings</a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </nav>
+{% extends "base.html" %}
+{% block title %}Change Detection — Veritas{% endblock %}
 
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        
-        <div class="flex justify-between items-center mb-8 justify-between">
-            <h1 class="text-2xl font-black text-gray-900">Change Detection: {{ project_id }}</h1>
-            <select class="rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm">
-                <option>Last 2 Commits</option>
-                <option>Last 7 Days</option>
-            </select>
-        </div>
+{% block content %}
 
-        {% if not insights %}
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
-            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-            <h3 class="mt-4 text-lg font-medium text-gray-900">Not enough data</h3>
-            <p class="mt-2 text-sm text-gray-500">We need at least two different commit hashes to compute a regression diff.</p>
-        </div>
+<div class="flex items-center justify-between mb-5">
+    <div>
+        <h1 class="text-lg font-bold text-slate-900">Change Detection</h1>
+        <p class="text-xs text-slate-400 mt-0.5">Cost regression analysis between your two most recent code versions</p>
+    </div>
+</div>
+
+{% if commits and commits|length >= 2 %}
+<!-- Commit comparison banner -->
+<div class="bg-slate-950 border border-slate-800 rounded-xl px-5 py-4 mb-5 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+        <span class="text-xs font-semibold text-slate-500 uppercase tracking-widest">Comparing</span>
+        <span class="mono text-sm bg-slate-800 text-slate-300 border border-slate-700 px-2.5 py-1 rounded-md">{{ commits[-2][:7] }}</span>
+        <svg class="w-4 h-4 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+        </svg>
+        <span class="mono text-sm bg-indigo-900/60 text-indigo-300 border border-indigo-700/60 px-2.5 py-1 rounded-md">{{ commits[-1][:7] }}</span>
+        <span class="text-xs text-slate-600 mono">HEAD</span>
+    </div>
+    <div class="flex items-center gap-4 text-xs mono">
+        {% set regression_count = insights | selectattr('is_regression') | list | length %}
+        {% if regression_count > 0 %}
+        <span class="text-red-400">{{ regression_count }} regression{{ 's' if regression_count > 1 else '' }}</span>
         {% else %}
-        
-        <div class="space-y-6">
-            {% for reg in insights %}
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative">
-                {% if reg.is_regression %}
-                <div class="absolute top-0 left-0 w-2 h-full bg-red-500"></div>
-                {% endif %}
-                
-                <div class="px-6 py-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 pl-8">
-                    <h3 class="text-lg font-bold text-gray-900">{{ reg.feature }}</h3>
-                    {% if reg.is_regression %}
-                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-bold bg-red-100 text-red-800">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"></path></svg>
-                        REGRESSION DETECTED
-                    </span>
-                    {% else %}
-                    <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                        Stable
-                    </span>
-                    {% endif %}
-                </div>
-                
-                <div class="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-gray-100">
-                    <div class="p-6 pl-8 flex flex-col justify-center">
-                        <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Previous Commit</p>
-                        <p class="font-mono text-sm inline-block bg-gray-100 px-2 py-1 rounded w-fit mb-4">{{ reg.prev_commit }}</p>
-                        <p class="text-3xl font-black text-gray-900">${{ "%.4f"|format(reg.prev_val) }} <span class="text-sm font-medium text-gray-500">avg</span></p>
-                    </div>
-                    
-                    <div class="p-6 flex flex-col justify-center">
-                        <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Latest Commit</p>
-                        <p class="font-mono text-sm inline-block bg-indigo-50 px-2 py-1 rounded text-indigo-700 w-fit mb-4">{{ reg.latest_commit }}</p>
-                        <p class="text-3xl font-black text-gray-900">${{ "%.4f"|format(reg.latest_val) }} <span class="text-sm font-medium text-gray-500">avg</span></p>
-                    </div>
-
-                    <div class="p-6 flex flex-col justify-center bg-gray-50/30">
-                        <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Impact</p>
-                        <div class="mt-1 flex items-center gap-3">
-                            <p class="text-4xl font-black {% if reg.is_regression %}text-red-600{% else %}text-emerald-600{% endif %}">
-                                {% if reg.is_regression %}+{% endif %}{{ "%.1f"|format(reg.diff_pct) }}%
-                            </p>
-                        </div>
-                        <p class="text-sm font-medium text-gray-500 mt-2">
-                            {% if reg.is_regression %}+{% endif %}${{ "%.4f"|format(reg.diff) }} per invocation
-                        </p>
-                    </div>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
+        <span class="text-emerald-400">all stable</span>
         {% endif %}
-    </main>
-</body>
-</html>
+        <span class="text-slate-600">{{ insights|length }} feature{{ 's' if insights|length != 1 else '' }} analyzed</span>
+    </div>
+</div>
+{% endif %}
+
+{% if not insights %}
+<div class="bg-white border border-slate-200 rounded-xl p-12 text-center">
+    <div class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-3">
+        <svg class="w-5 h-5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+    </div>
+    <p class="text-sm font-semibold text-slate-700">Not enough data to compare</p>
+    {% if commits and commits|length == 1 %}
+    <p class="text-xs text-slate-400 mt-2 mono">1 commit found: <span class="bg-slate-100 px-1.5 py-0.5 rounded">{{ commits[0][:7] }}</span> — run with a second commit hash to enable comparison</p>
+    {% else %}
+    <p class="text-xs text-slate-400 mt-2">No events found for <span class="mono font-medium">{{ project_id }}</span>. Make sure your SDK is configured and sending events.</p>
+    {% endif %}
+</div>
+
+{% else %}
+<div class="space-y-4">
+    {% for reg in insights %}
+    <div class="bg-white border border-slate-200 rounded-xl overflow-hidden
+        {% if reg.is_regression %}border-l-4 border-l-red-500{% else %}border-l-4 border-l-emerald-500{% endif %}">
+
+        <!-- Card header -->
+        <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+            <div class="flex items-center gap-3">
+                <h3 class="text-sm font-bold text-slate-900 mono">{{ reg.feature }}</h3>
+            </div>
+            {% if reg.is_regression %}
+            <span class="inline-flex items-center gap-1.5 text-xs font-bold bg-red-50 text-red-700 border border-red-200 px-2.5 py-1 rounded-md">
+                <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+                REGRESSION
+            </span>
+            {% else %}
+            <span class="inline-flex items-center gap-1.5 text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-md">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                Stable
+            </span>
+            {% endif %}
+        </div>
+
+        <!-- Comparison columns -->
+        <div class="grid grid-cols-3 divide-x divide-slate-100">
+            <div class="p-5">
+                <p class="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">Previous</p>
+                <p class="mono text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-md inline-block mb-3">{{ reg.prev_commit[:7] }}</p>
+                <p class="text-2xl font-black mono text-slate-700">${{ "%.5f"|format(reg.prev_val) }}</p>
+                <p class="text-xs text-slate-400 mt-1">avg per call</p>
+            </div>
+            <div class="p-5">
+                <p class="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">Latest</p>
+                <p class="mono text-xs bg-indigo-50 text-indigo-600 border border-indigo-100 px-2 py-1 rounded-md inline-block mb-3">{{ reg.latest_commit[:7] }}</p>
+                <p class="text-2xl font-black mono {% if reg.is_regression %}text-red-600{% else %}text-slate-700{% endif %}">${{ "%.5f"|format(reg.latest_val) }}</p>
+                <p class="text-xs text-slate-400 mt-1">avg per call</p>
+            </div>
+            <div class="p-5 bg-slate-50/40">
+                <p class="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">Delta</p>
+                <p class="text-3xl font-black mono {% if reg.is_regression %}text-red-600{% else %}text-emerald-600{% endif %}">
+                    {% if reg.diff_pct > 0 %}+{% endif %}{{ "%.1f"|format(reg.diff_pct) }}%
+                </p>
+                <p class="text-xs mono mt-2 {% if reg.is_regression %}text-red-500{% else %}text-emerald-600{% endif %}">
+                    {% if reg.diff > 0 %}+{% endif %}${{ "%.5f"|format(reg.diff) }} per call
+                </p>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% endblock %}

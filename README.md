@@ -248,3 +248,134 @@ python -m pytest
 # Verify import
 python -c "import veritas; print(veritas.__version__)"
 ```
+
+---
+
+## 6. SDK Integration Guide
+
+### Installation
+
+```bash
+pip install veritas   # or: pip install -e . for local dev
+```
+
+### Configuration
+
+Set these in a `.env` file in your project root:
+
+```bash
+VERITAS_API_KEY=sk-vrt-your-key-here     # From Dashboard > Settings
+VERITAS_API_URL=http://localhost:8000/api/v1/events
+VERITAS_MOCK_COMMIT=my-feature-branch    # Optional: override git hash for testing
+```
+
+> **Important:** Use `load_dotenv(override=True)` in your app entrypoint so `.env` always wins over existing shell env vars.
+
+---
+
+### Anthropic Integration
+
+```python
+import anthropic
+import veritas
+
+# One-line swap — only change your client initialization:
+client = veritas.Anthropic(
+    anthropic.AsyncAnthropic(),
+    feature_name="beach_recommendation"  # Groups calls in the dashboard
+)
+
+# Non-streaming — identical to regular anthropic usage:
+response = await client.messages.create(
+    model="claude-3-haiku-20240307",
+    max_tokens=1024,
+    messages=[{"role": "user", "content": "..."}]
+)
+
+# Streaming — also identical, cost tracked when stream ends:
+async for event in await client.messages.create(
+    model="claude-3-haiku-20240307",
+    max_tokens=1024,
+    messages=[{"role": "user", "content": "..."}],
+    stream=True
+):
+    if event.type == "content_block_delta":
+        print(event.delta.text, end="")
+```
+
+---
+
+### OpenAI Integration
+
+```python
+import openai
+import veritas
+
+# One-line swap:
+client = veritas.OpenAI(
+    openai.AsyncOpenAI(),
+    feature_name="document_summary"
+)
+
+# Non-streaming:
+response = await client.chat.completions.create(
+    model="gpt-4o",
+    messages=[{"role": "user", "content": "..."}]
+)
+
+# Streaming — veritas auto-injects stream_options for usage capture:
+async for chunk in await client.chat.completions.create(
+    model="gpt-4o",
+    messages=[{"role": "user", "content": "..."}],
+    stream=True
+):
+    print(chunk.choices[0].delta.content or "", end="")
+```
+
+---
+
+### Data Flow — How Tokens Are Captured
+
+| Mode | Provider | Token source | Event fires |
+|---|---|---|---|
+| Non-streaming sync | Anthropic | `response.usage.input_tokens` / `output_tokens` | After `create()` returns |
+| Non-streaming async | Anthropic | `response.usage.input_tokens` / `output_tokens` | After `await create()` |
+| Streaming sync | Anthropic | `message_start` event → input; `message_delta` event → output | When stream iterator exhausted |
+| Streaming async | Anthropic | Same, via `async for` | When async iterator exhausted |
+| Non-streaming sync | OpenAI | `response.usage.prompt_tokens` / `completion_tokens` | After `create()` returns |
+| Non-streaming async | OpenAI | `response.usage.prompt_tokens` / `completion_tokens` | After `await create()` |
+| Streaming sync | OpenAI | Final chunk (auto-injected `stream_options`) `prompt_tokens` / `completion_tokens` | When stream iterator exhausted |
+| Streaming async | OpenAI | Same, via `async for` | When async iterator exhausted |
+
+> Veritas auto-injects `stream_options={"include_usage": True}` for OpenAI streaming calls. The caller's code is unchanged.
+
+---
+
+### Pricing Reference (USD per 1M tokens)
+
+#### Anthropic Claude
+
+| Model | Input | Output | Cache Write | Cache Read |
+|---|---|---|---|---|
+| claude-opus-4 | $5.00 | $25.00 | $6.25 | $0.50 |
+| claude-sonnet-4 | $3.00 | $15.00 | $3.75 | $0.30 |
+| claude-haiku-4 | $1.00 | $5.00 | $1.25 | $0.10 |
+| claude-3-5-sonnet | $3.00 | $15.00 | $3.75 | $0.30 |
+| claude-3-5-haiku | $0.80 | $4.00 | $1.00 | $0.08 |
+| claude-3-opus | $15.00 | $75.00 | $18.75 | $1.50 |
+| claude-3-haiku | $0.25 | $1.25 | $0.30 | $0.03 |
+
+#### OpenAI
+
+| Model | Input | Output | Cached Input |
+|---|---|---|---|
+| o1 | $15.00 | $60.00 | $7.50 |
+| o1-mini | $3.00 | $12.00 | $1.50 |
+| o3-mini | $1.10 | $4.40 | $0.55 |
+| gpt-4o | $2.50 | $10.00 | $1.25 |
+| gpt-4o-mini | $0.15 | $0.60 | $0.075 |
+| gpt-4-turbo | $10.00 | $30.00 | — |
+| gpt-4 | $30.00 | $60.00 | — |
+| gpt-3.5-turbo | $0.50 | $1.50 | — |
+
+Unknown models fall back to `gpt-4o-mini` pricing and are marked `estimated=true` in the dashboard.
