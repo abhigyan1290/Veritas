@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Veritas Cloud Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Navigation -->
+    <nav class="bg-white border-b border-gray-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <span class="text-2xl font-black text-indigo-600 tracking-tighter">veritas</span>
+                    <div class="hidden md:ml-6 md:flex md:space-x-8">
+                        <a href="/" class="border-indigo-500 text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">Dashboard</a>
+                        <a href="/regressions" class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">Regressions</a>
+                        <a href="/settings" class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">Settings</a>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="text-sm font-medium text-gray-500 uppercase tracking-wide">Environment: Global</div>
+                    <div class="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold">A</div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        <!-- Metrics Section -->
+        <h2 class="text-lg font-bold text-gray-900 mb-4">Platform Overview</h2>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col justify-between">
+                <p class="text-sm font-medium text-gray-500">Total Spend</p>
+                <div class="mt-2 flex items-baseline gap-2">
+                    <p class="text-4xl font-black text-gray-900">${{ "%.4f"|format(total_cost) }}</p>
+                    <p class="text-sm font-medium text-emerald-600">+12%</p>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col justify-between">
+                <p class="text-sm font-medium text-gray-500">Events Processed</p>
+                <div class="mt-2 flex items-baseline gap-2">
+                    <p class="text-4xl font-black text-gray-900">{{ total_events }}</p>
+                    <p class="text-sm font-medium text-emerald-600">Active</p>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col justify-between">
+                <p class="text-sm font-medium text-gray-500">Tokens Processed</p>
+                <div class="mt-2 flex items-baseline gap-2">
+                    <p class="text-4xl font-black text-gray-900">{{ "{:,}".format(total_tokens) }}</p>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col justify-between">
+                <p class="text-sm font-medium text-gray-500">Avg Latency (ms)</p>
+                <div class="mt-2 flex items-baseline gap-2">
+                    <p class="text-4xl font-black text-gray-900">{{ "%.1f"|format(avg_latency) }}</p>
+                    <p class="text-sm font-medium text-rose-500">+150ms</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Two Column Layout -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <!-- Left Column: Activity Feed -->
+            <div class="lg:col-span-2">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div class="px-6 py-5 border-b border-gray-100 flex justify-between items-center">
+                        <h3 class="text-lg font-bold text-gray-900">Live Global Feed</h3>
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            Streaming
+                        </span>
+                    </div>
+                    <ul class="divide-y divide-gray-100 overflow-y-auto max-h-[600px]">
+                        {% for event in events %}
+                        <li class="p-6 hover:bg-gray-50 transition-colors">
+                            <div class="flex items-center justify-between">
+                                <div class="flex flex-col gap-1">
+                                    <div class="flex items-center gap-3">
+                                        <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">{{ event.project_id }}</span>
+                                        <p class="text-sm font-bold text-gray-900">{{ event.feature }}</p>
+                                    </div>
+                                    <div class="flex items-center gap-4 text-xs tracking-wide text-gray-500">
+                                        <span class="font-mono bg-gray-100 px-1 py-0.5 rounded">{{ event.model }}</span>
+                                        <span>{{ event.tokens_in }} In/{{ event.tokens_out }} Out</span>
+                                    </div>
+                                    <div class="flex items-center gap-4 text-xs text-gray-400 mt-1">
+                                        <span>{{ event.timestamp[:19].replace('T', ' ') }}</span>
+                                        <span>Ver: {{ event.code_version[:7] if event.code_version else 'unknown' }}</span>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-lg font-black text-gray-900">${{ "%.5f"|format(event.cost_usd) }}</p>
+                                    <p class="text-sm text-gray-500">{{ "%.0f"|format(event.latency_ms) }} ms</p>
+                                </div>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Right Column: Active Projects -->
+            <div class="lg:col-span-1">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div class="px-6 py-5 border-b border-gray-100">
+                        <h3 class="text-lg font-bold text-gray-900">Active Workspaces</h3>
+                    </div>
+                    <ul class="divide-y divide-gray-100">
+                        {% for project in projects %}
+                        <li class="p-5 hover:bg-gray-50 transition-colors cursor-pointer group">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">{{ project.name }}</p>
+                                    <p class="text-xs text-gray-500 mt-1 font-mono">{{ project.id }}</p>
+                                </div>
+                                <svg class="h-5 w-5 text-gray-400 group-hover:text-indigo-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                </svg>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    <div class="p-4 bg-gray-50 border-t border-gray-100">
+                        <a href="/settings" class="w-full flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 transition-colors">
+                            Provision New Workspace
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+</body>
+</html>

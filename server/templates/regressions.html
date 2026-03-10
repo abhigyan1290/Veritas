@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Regressions - Veritas Cloud</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <nav class="bg-white border-b border-gray-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <span class="text-2xl font-black text-indigo-600 tracking-tighter">veritas</span>
+                    <div class="hidden md:ml-6 md:flex md:space-x-8">
+                        <a href="/" class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">Dashboard</a>
+                        <a href="/regressions" class="border-indigo-500 text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">Regressions</a>
+                        <a href="/settings" class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">Settings</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        <div class="flex justify-between items-center mb-8 justify-between">
+            <h1 class="text-2xl font-black text-gray-900">Change Detection: {{ project_id }}</h1>
+            <select class="rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm">
+                <option>Last 2 Commits</option>
+                <option>Last 7 Days</option>
+            </select>
+        </div>
+
+        {% if not insights %}
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
+            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            <h3 class="mt-4 text-lg font-medium text-gray-900">Not enough data</h3>
+            <p class="mt-2 text-sm text-gray-500">We need at least two different commit hashes to compute a regression diff.</p>
+        </div>
+        {% else %}
+        
+        <div class="space-y-6">
+            {% for reg in insights %}
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative">
+                {% if reg.is_regression %}
+                <div class="absolute top-0 left-0 w-2 h-full bg-red-500"></div>
+                {% endif %}
+                
+                <div class="px-6 py-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 pl-8">
+                    <h3 class="text-lg font-bold text-gray-900">{{ reg.feature }}</h3>
+                    {% if reg.is_regression %}
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-bold bg-red-100 text-red-800">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"></path></svg>
+                        REGRESSION DETECTED
+                    </span>
+                    {% else %}
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                        Stable
+                    </span>
+                    {% endif %}
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-gray-100">
+                    <div class="p-6 pl-8 flex flex-col justify-center">
+                        <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Previous Commit</p>
+                        <p class="font-mono text-sm inline-block bg-gray-100 px-2 py-1 rounded w-fit mb-4">{{ reg.prev_commit }}</p>
+                        <p class="text-3xl font-black text-gray-900">${{ "%.4f"|format(reg.prev_val) }} <span class="text-sm font-medium text-gray-500">avg</span></p>
+                    </div>
+                    
+                    <div class="p-6 flex flex-col justify-center">
+                        <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Latest Commit</p>
+                        <p class="font-mono text-sm inline-block bg-indigo-50 px-2 py-1 rounded text-indigo-700 w-fit mb-4">{{ reg.latest_commit }}</p>
+                        <p class="text-3xl font-black text-gray-900">${{ "%.4f"|format(reg.latest_val) }} <span class="text-sm font-medium text-gray-500">avg</span></p>
+                    </div>
+
+                    <div class="p-6 flex flex-col justify-center bg-gray-50/30">
+                        <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Impact</p>
+                        <div class="mt-1 flex items-center gap-3">
+                            <p class="text-4xl font-black {% if reg.is_regression %}text-red-600{% else %}text-emerald-600{% endif %}">
+                                {% if reg.is_regression %}+{% endif %}{{ "%.1f"|format(reg.diff_pct) }}%
+                            </p>
+                        </div>
+                        <p class="text-sm font-medium text-gray-500 mt-2">
+                            {% if reg.is_regression %}+{% endif %}${{ "%.4f"|format(reg.diff) }} per invocation
+                        </p>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </main>
+</body>
+</html>
