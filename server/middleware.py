@@ -8,7 +8,7 @@ from server.models import User
 class SessionMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         # Allow open access to these paths
-        open_paths = ["/auth/login", "/auth/signup", "/auth/logout", "/health"]
+        open_paths = ["/auth/login", "/auth/signup", "/auth/logout", "/health", "/admin/create-user"]
         
         # Static files and API ingested routes bypass the dashboard session check
         if request.url.path.startswith("/api/") or request.url.path in open_paths:
