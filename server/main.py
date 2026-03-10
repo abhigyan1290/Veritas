@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from server.database import engine, Base
 from server.routes import dashboard, ingest, auth
 from server.middleware import SessionMiddleware
+from server.demo_tenant import ensure_demo_tenant
 
 import time
 import os
@@ -10,6 +11,14 @@ import os
 for i in range(5):
     try:
         Base.metadata.create_all(bind=engine)
+        
+        from server.database import SessionLocal
+        db = SessionLocal()
+        try:
+            ensure_demo_tenant(db)
+        finally:
+            db.close()
+            
         break
     except Exception as e:
         if i == 4:
