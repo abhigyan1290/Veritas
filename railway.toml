@@ -2,6 +2,6 @@
 builder = "nixpacks"
 
 [deploy]
-startCommand = "python server/main.py"
+startCommand = "python -m server.main"
 healthcheckPath = "/health"
 restartPolicyType = "on_failure"
