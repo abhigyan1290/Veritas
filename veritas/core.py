@@ -1,5 +1,6 @@
 """Core tracking decorator and event handling."""
 
+import inspect
 import time
 from dataclasses import dataclass
 from functools import wraps
@@ -103,6 +104,61 @@ def track(
     """
 
     def decorator(func: F) -> F:
+        if inspect.iscoroutinefunction(func):
+            @wraps(func)
+            async def async_wrapper(*args, **kwargs):
+                used_sink = sink if sink is not None else _default_sink
+                start = time.perf_counter()
+                try:
+                    result = await func(*args, **kwargs)
+                    latency_ms = (time.perf_counter() - start) * 1000
+
+                    model, tokens_in, tokens_out, cache_creation_tokens, cache_read_tokens = _extract_usage(result)
+                    cost_usd, estimated = compute_cost(
+                        tokens_in=tokens_in,
+                        tokens_out=tokens_out,
+                        model=model,
+                        cache_creation_tokens=cache_creation_tokens,
+                        cache_read_tokens=cache_read_tokens,
+                    )
+                    event = CostEvent(
+                        feature=feature,
+                        model=model,
+                        tokens_in=tokens_in,
+                        tokens_out=tokens_out,
+                        cache_creation_tokens=cache_creation_tokens,
+                        cache_read_tokens=cache_read_tokens,
+                        latency_ms=round(latency_ms, 2),
+                        cost_usd=cost_usd,
+                        code_version=get_current_commit_hash(),
+                        timestamp=utc_now_iso(),
+                        status="ok",
+                        estimated=estimated,
+                    )
+                    used_sink.emit(event)
+                    return result
+
+                except Exception:
+                    latency_ms = (time.perf_counter() - start) * 1000
+                    event = CostEvent(
+                        feature=feature,
+                        model="unknown",
+                        tokens_in=0,
+                        tokens_out=0,
+                        cache_creation_tokens=0,
+                        cache_read_tokens=0,
+                        latency_ms=round(latency_ms, 2),
+                        cost_usd=0.0,
+                        code_version=get_current_commit_hash(),
+                        timestamp=utc_now_iso(),
+                        status="error",
+                        estimated=True,
+                    )
+                    used_sink.emit(event)
+                    raise
+
+            return async_wrapper  # type: ignore
+
         @wraps(func)
         def wrapper(*args, **kwargs):
             used_sink = sink if sink is not None else _default_sink
@@ -117,9 +173,8 @@ def track(
                     tokens_out=tokens_out,
                     model=model,
                     cache_creation_tokens=cache_creation_tokens,
-                    cache_read_tokens=cache_read_tokens
+                    cache_read_tokens=cache_read_tokens,
                 )
-
                 event = CostEvent(
                     feature=feature,
                     model=model,

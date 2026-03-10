@@ -1,16 +1,12 @@
 import sys
 import os
-
-# Add the root directory to path so we can import server.database
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, ROOT)
-
-from server.database import SessionLocal
-from server.models import User
-from server.auth_users import hash_password
-from datetime import datetime, timezone
 import string
 import random
+import requests
+
+# Config - these can be overridden via environment variables
+BASE_URL = os.environ.get("VERITAS_BASE_URL", "https://web-production-82424.up.railway.app")
+ADMIN_SECRET = os.environ.get("VERITAS_ADMIN_SECRET", "local-admin-secret")
 
 def generate_random_password(length=12):
     """Generate a secure alphanumeric password."""
@@ -19,42 +15,41 @@ def generate_random_password(length=12):
 
 def create_invite(username: str):
     print(f"Generating invite for username: {username} ...")
-    
-    db = SessionLocal()
+
+    password = generate_random_password()
+
     try:
-        existing = db.query(User).filter(User.username == username).first()
-        if existing:
-            print(f"❌ User '{username}' already exists in the database.")
-            return
-        
-        password = generate_random_password()
-        hashed_pw = hash_password(password)
-        
-        new_user = User(
-            username=username,
-            password_hash=hashed_pw,
-            created_at=datetime.now(timezone.utc)
+        res = requests.post(
+            f"{BASE_URL}/admin/create-user",
+            params={"username": username, "password": password},
+            headers={"x-admin-secret": ADMIN_SECRET},
+            timeout=15
         )
-        db.add(new_user)
-        db.commit()
-        
-        print(f"✅ Successfully created secure invite!")
-        print(f"----------------------------------------")
-        print(f"Username: {username}")
-        print(f"Password: {password}")
-        print(f"----------------------------------------")
-        print("Share these credentials securely. They cannot be recovered if lost.")
-        
+
+        if res.status_code == 200:
+            print(f"Success! Created secure invite.")
+            print(f"----------------------------------------")
+            print(f"Username: {username}")
+            print(f"Password: {password}")
+            print(f"----------------------------------------")
+            print("Share these credentials securely. They cannot be recovered if lost.")
+        elif res.status_code == 409:
+            print(f"Error: User '{username}' already exists on the server.")
+        elif res.status_code == 403:
+            print("Error: Admin secret is incorrect. Check VERITAS_ADMIN_SECRET.")
+        else:
+            print(f"Error: Server returned {res.status_code}: {res.text}")
+
+    except requests.exceptions.ConnectionError:
+        print(f"Error: Could not connect to {BASE_URL}. Is the server running?")
     except Exception as e:
-        print(f"❌ Failed to create user: {e}")
-        db.rollback()
-    finally:
-        db.close()
+        print(f"Error: {e}")
+
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python generate_invite.py <desired_username>")
+        print("Usage: python scripts/generate_invite.py <desired_username>")
         sys.exit(1)
-        
+
     target_username = sys.argv[1].strip()
     create_invite(target_username)

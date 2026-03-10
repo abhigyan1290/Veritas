@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Depends, Request, Form, Response
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import APIRouter, Depends, Request, Form, Response, Header, HTTPException
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
@@ -11,6 +11,9 @@ from server.auth_users import hash_password, verify_password, create_session_tok
 
 router = APIRouter()
 templates = Jinja2Templates(directory="server/templates")
+
+# Secret used to authorize the invite creation script
+ADMIN_SECRET = os.environ.get("VERITAS_ADMIN_SECRET", "local-admin-secret")
 
 ALLOW_SIGNUPS = os.environ.get("ALLOW_SIGNUPS", "false").lower() == "true"
 
@@ -65,3 +68,27 @@ def logout(response: Response):
     resp = RedirectResponse(url="/auth/login", status_code=303)
     resp.delete_cookie("veritas_session")
     return resp
+
+@router.post("/admin/create-user")
+def admin_create_user(
+    username: str,
+    password: str,
+    x_admin_secret: str = Header(...),
+    db: Session = Depends(get_db)
+):
+    """Secure endpoint for the invite script to create users server-side."""
+    if x_admin_secret != ADMIN_SECRET:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    
+    existing = db.query(User).filter(User.username == username).first()
+    if existing:
+        raise HTTPException(status_code=409, detail=f"User '{username}' already exists")
+    
+    new_user = User(
+        username=username,
+        password_hash=hash_password(password),
+        created_at=datetime.now(timezone.utc)
+    )
+    db.add(new_user)
+    db.commit()
+    return JSONResponse({"status": "created", "username": username})
