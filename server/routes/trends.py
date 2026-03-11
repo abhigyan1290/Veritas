@@ -17,16 +17,16 @@ def trends(request: Request):
     db = SessionLocal()
     try:
         projects = db.query(Project).filter(Project.user_id == current_user.id).all()
-        project_id = request.query_params.get("project_id", projects[0].id if projects else None)
 
-        # Tenant guard — users can only see their own projects
-        if project_id:
-            project = db.query(Project).filter(
-                Project.id == project_id,
-                Project.user_id == current_user.id
-            ).first()
-            if not project:
-                return RedirectResponse("/", status_code=302)
+        # Resolve project_id — fall back to first owned project if requested one isn't theirs
+        raw_pid = request.query_params.get("project_id")
+        if raw_pid and projects:
+            owned = next((p for p in projects if p.id == raw_pid), None)
+            project_id = owned.id if owned else projects[0].id
+        elif projects:
+            project_id = projects[0].id
+        else:
+            project_id = None
 
         # Build 30-day date range
         today = datetime.now(timezone.utc).date()

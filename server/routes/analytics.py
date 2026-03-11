@@ -18,15 +18,15 @@ def analytics_features(request: Request):
     db = SessionLocal()
     try:
         projects = db.query(Project).filter(Project.user_id == current_user.id).all()
-        project_id = request.query_params.get("project_id", projects[0].id if projects else None)
 
-        if project_id:
-            project = db.query(Project).filter(
-                Project.id == project_id,
-                Project.user_id == current_user.id
-            ).first()
-            if not project:
-                return RedirectResponse("/", status_code=302)
+        raw_pid = request.query_params.get("project_id")
+        if raw_pid and projects:
+            owned = next((p for p in projects if p.id == raw_pid), None)
+            project_id = owned.id if owned else projects[0].id
+        elif projects:
+            project_id = projects[0].id
+        else:
+            project_id = None
 
         feature_rows = []
         total_project_cost = 0.0
@@ -95,15 +95,15 @@ def analytics_models(request: Request):
     db = SessionLocal()
     try:
         projects = db.query(Project).filter(Project.user_id == current_user.id).all()
-        project_id = request.query_params.get("project_id", projects[0].id if projects else None)
 
-        if project_id:
-            project = db.query(Project).filter(
-                Project.id == project_id,
-                Project.user_id == current_user.id
-            ).first()
-            if not project:
-                return RedirectResponse("/", status_code=302)
+        raw_pid = request.query_params.get("project_id")
+        if raw_pid and projects:
+            owned = next((p for p in projects if p.id == raw_pid), None)
+            project_id = owned.id if owned else projects[0].id
+        elif projects:
+            project_id = projects[0].id
+        else:
+            project_id = None
 
         model_rows = []
         chart_labels = []
