@@ -3,6 +3,25 @@
 
 {% block content %}
 
+<!-- Health indicator banner -->
+{% if wow_change_pct is not none %}
+<div class="mb-5 flex items-center gap-3 px-5 py-3 rounded-xl border text-sm font-semibold
+    {% if wow_change_pct > 10 %}bg-red-50 border-red-200 text-red-700
+    {% elif wow_change_pct < -5 %}bg-emerald-50 border-emerald-200 text-emerald-700
+    {% else %}bg-slate-100 border-slate-200 text-slate-600{% endif %}">
+    {% if wow_change_pct > 10 %}
+    <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    Avg cost per call is <span class="mono font-black ml-1">+{{ "%.1f"|format(wow_change_pct) }}%</span>&nbsp;this week vs last — costs are rising
+    {% elif wow_change_pct < -5 %}
+    <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+    Avg cost per call is <span class="mono font-black ml-1">{{ "%.1f"|format(wow_change_pct) }}%</span>&nbsp;this week vs last — costs are improving
+    {% else %}
+    <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    Costs are stable this week &mdash; <span class="mono font-black ml-1">{{ "%+.1f"|format(wow_change_pct) }}%</span>&nbsp;vs last week
+    {% endif %}
+</div>
+{% endif %}
+
 <!-- Stat cards -->
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
 

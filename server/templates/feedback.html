@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% block title %}Beta Feedback — Veritas{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto py-4">
+
+  <!-- Page header -->
+  <div class="mb-8 text-center">
+    <div class="inline-flex items-center gap-2 bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-semibold px-3 py-1.5 rounded-full mb-4 uppercase tracking-widest">
+      Beta Program
+    </div>
+    <h1 class="text-3xl font-black text-slate-900 tracking-tight mb-2">Beta Feedback</h1>
+    <p class="text-slate-500 text-sm">Help shape Veritas — your input goes directly to the team</p>
+  </div>
+
+  <!-- Form card -->
+  <div class="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm">
+    <form method="POST" action="/feedback" class="space-y-10">
+
+      <!-- Section 1: NPS -->
+      <div>
+        <p class="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3">Recommendation</p>
+        <p class="text-base font-semibold text-slate-900 mb-4">How likely are you to recommend Veritas to a developer you know?</p>
+        <div class="flex gap-1.5">
+          {% for i in range(1, 11) %}
+          <label class="flex-1">
+            <input type="radio" name="nps_score" value="{{ i }}" class="sr-only peer" required>
+            <div class="text-center py-3 rounded-lg border text-sm font-bold mono cursor-pointer transition-all
+                        bg-slate-100 border-slate-200 text-slate-600 hover:bg-indigo-50 hover:border-indigo-300
+                        peer-checked:bg-indigo-600 peer-checked:border-indigo-600 peer-checked:text-white">
+              {{ i }}
+            </div>
+          </label>
+          {% endfor %}
+        </div>
+        <div class="flex justify-between text-xs text-slate-400 mt-1 px-0.5">
+          <span>Not likely</span>
+          <span class="text-center">Neutral</span>
+          <span>Very likely</span>
+        </div>
+      </div>
+
+      <!-- Section 2: Willingness to Pay -->
+      <div>
+        <p class="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3">Pricing</p>
+        <p class="text-base font-semibold text-slate-900 mb-4">What would you pay per month for Veritas?</p>
+        <div class="grid grid-cols-3 gap-3">
+          {% set pay_options = [
+            ("free", "Free", "Just the basics"),
+            ("$10", "$10 / month", "Starter tier"),
+            ("$25", "$25 / month", "Pro tier"),
+            ("$50", "$50 / month", "Team tier"),
+            ("$100+", "$100+ / month", "Enterprise tier"),
+            ("not_sure", "Not sure", "Still evaluating")
+          ] %}
+          {% for value, label, sub in pay_options %}
+          <label class="relative cursor-pointer">
+            <input type="radio" name="willing_to_pay" value="{{ value }}" class="sr-only peer" required>
+            <div class="border-2 rounded-xl p-4 transition-all
+                        border-slate-200 bg-white hover:border-indigo-200 hover:bg-indigo-50/40
+                        peer-checked:border-indigo-500 peer-checked:bg-indigo-50">
+              <div class="text-sm font-bold text-slate-900 mono">{{ label }}</div>
+              <div class="text-xs text-slate-400 mt-0.5">{{ sub }}</div>
+            </div>
+            <div class="absolute top-3 right-3 w-4 h-4 rounded-full border-2 border-slate-300 peer-checked:border-indigo-500 flex items-center justify-center transition-all
+                        [label:has(input:checked)_&]:border-indigo-500 hidden peer-checked:hidden">
+            </div>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Section 3: Features -->
+      <div>
+        <p class="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3">Features</p>
+        <p class="text-base font-semibold text-slate-900 mb-4">Which features matter most to you? <span class="text-slate-400 font-normal">(select all that apply)</span></p>
+        <div class="grid grid-cols-2 gap-3">
+          {% set feature_options = [
+            ("cost_per_feature", "Cost per feature", "See exactly which features cost the most"),
+            ("regression_detection", "Regression detection", "Get alerted when a code change raises costs"),
+            ("per_commit_comparison", "Per-commit comparison", "Compare costs between two code versions"),
+            ("model_cost_breakdown", "Model cost breakdown", "Understand which AI models are expensive"),
+            ("spend_trends", "Spend trends", "Track cost over time"),
+            ("sdk_integration", "SDK integration", "One-line setup with the Veritas SDK")
+          ] %}
+          {% for value, label, desc in feature_options %}
+          <label class="relative cursor-pointer">
+            <input type="checkbox" name="features" value="{{ value }}" class="sr-only peer">
+            <div class="border-2 rounded-xl p-4 h-full transition-all
+                        border-slate-200 bg-white hover:border-indigo-200 hover:bg-indigo-50/40
+                        peer-checked:border-indigo-500 peer-checked:bg-indigo-50">
+              <div class="flex items-start gap-3">
+                <div class="mt-0.5 w-4 h-4 rounded border-2 border-slate-300 shrink-0 flex items-center justify-center transition-all
+                            peer-checked:bg-indigo-600 peer-checked:border-indigo-600
+                            [label:has(input:checked)_&]:bg-indigo-600 [label:has(input:checked)_&]:border-indigo-600">
+                  <svg class="w-2.5 h-2.5 text-white hidden [label:has(input:checked)_&]:block" viewBox="0 0 10 8" fill="none">
+                    <path d="M1 4l3 3 5-6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </div>
+                <div>
+                  <div class="text-sm font-semibold text-slate-900">{{ label }}</div>
+                  <div class="text-xs text-slate-400 mt-0.5 leading-relaxed">{{ desc }}</div>
+                </div>
+              </div>
+            </div>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Section 4: Open text -->
+      <div>
+        <p class="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3">Open Feedback</p>
+        <p class="text-base font-semibold text-slate-900 mb-4">What would make Veritas indispensable to your workflow?</p>
+        <textarea
+          name="feedback_text"
+          rows="4"
+          placeholder="Share anything — feature ideas, pain points, what's already working..."
+          class="w-full px-4 py-3 text-sm text-slate-900 bg-white border-2 border-slate-200 rounded-xl
+                 focus:outline-none focus:border-indigo-400 focus:ring-0
+                 placeholder:text-slate-400 resize-none transition-colors"
+        ></textarea>
+      </div>
+
+      <!-- Section 5: Optional contact -->
+      <div>
+        <p class="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3">Contact <span class="text-slate-300 font-normal normal-case tracking-normal">— optional</span></p>
+        <p class="text-base font-semibold text-slate-900 mb-4">Want us to follow up?</p>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1.5">Name</label>
+            <input
+              type="text"
+              name="name"
+              placeholder="Your name"
+              class="w-full px-4 py-2.5 text-sm text-slate-900 bg-white border-2 border-slate-200 rounded-xl
+                     focus:outline-none focus:border-indigo-400 placeholder:text-slate-400 transition-colors"
+            >
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1.5">Email</label>
+            <input
+              type="email"
+              name="email"
+              placeholder="you@company.com"
+              class="w-full px-4 py-2.5 text-sm text-slate-900 bg-white border-2 border-slate-200 rounded-xl
+                     focus:outline-none focus:border-indigo-400 placeholder:text-slate-400 transition-colors"
+            >
+          </div>
+        </div>
+      </div>
+
+      <!-- Submit -->
+      <div class="pt-2">
+        <button
+          type="submit"
+          class="w-full py-3.5 px-6 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800
+                 text-white text-sm font-bold rounded-xl transition-colors shadow-sm shadow-indigo-200"
+        >
+          Submit Feedback &rarr;
+        </button>
+        <p class="text-center text-xs text-slate-400 mt-3">Your responses are anonymous and go directly to the Veritas team.</p>
+      </div>
+
+    </form>
+  </div>
+</div>
+{% endblock %}

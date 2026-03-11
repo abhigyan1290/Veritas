@@ -1,0 +1,345 @@
+{% extends "base.html" %}
+{% block title %}Feedback Results — Veritas{% endblock %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<!-- Page header -->
+<div class="flex items-center justify-between mb-6">
+  <div>
+    <h1 class="text-2xl font-black text-slate-900 tracking-tight">Beta Feedback Results</h1>
+    <p class="text-sm text-slate-500 mt-0.5">
+      <span class="mono font-semibold text-slate-700">{{ total_responses }}</span> response{{ 's' if total_responses != 1 else '' }} collected
+    </p>
+  </div>
+  <span class="text-xs font-semibold text-slate-400 uppercase tracking-widest bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-lg">Admin View</span>
+</div>
+
+{% if total_responses == 0 %}
+<div class="bg-white border border-slate-200 rounded-xl p-12 text-center">
+  <p class="text-slate-400 text-sm">No feedback submitted yet.</p>
+</div>
+{% else %}
+
+<!-- Hero NPS Card -->
+<div class="bg-slate-950 rounded-xl p-8 mb-6">
+  <div class="flex items-center justify-between">
+    <div>
+      <p class="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">Net Promoter Score</p>
+      <div class="text-7xl font-black mono text-white leading-none">
+        {% if nps_calculated > 0 %}+{% endif %}{{ nps_calculated|int }}
+      </div>
+      <p class="text-slate-500 text-xs mt-3">Based on {{ total_responses }} response{{ 's' if total_responses != 1 else '' }}</p>
+    </div>
+    <div class="flex gap-8">
+      <div class="text-center">
+        <div class="text-3xl font-black mono text-emerald-400">{{ nps_promoters }}</div>
+        <div class="text-xs font-semibold text-emerald-600 uppercase tracking-widest mt-1">Promoters</div>
+        <div class="text-xs text-slate-600 mt-0.5">Score 9–10</div>
+      </div>
+      <div class="text-center">
+        <div class="text-3xl font-black mono text-amber-400">{{ nps_passives }}</div>
+        <div class="text-xs font-semibold text-amber-600 uppercase tracking-widest mt-1">Passives</div>
+        <div class="text-xs text-slate-600 mt-0.5">Score 7–8</div>
+      </div>
+      <div class="text-center">
+        <div class="text-3xl font-black mono text-red-400">{{ nps_detractors }}</div>
+        <div class="text-xs font-semibold text-red-600 uppercase tracking-widest mt-1">Detractors</div>
+        <div class="text-xs text-slate-600 mt-0.5">Score 1–6</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Stats row -->
+<div class="grid grid-cols-3 gap-4 mb-6">
+  <div class="bg-white border border-slate-200 rounded-xl p-5">
+    <p class="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">Total Responses</p>
+    <div class="text-3xl font-black mono text-slate-900">{{ total_responses }}</div>
+  </div>
+  <div class="bg-white border border-slate-200 rounded-xl p-5">
+    <p class="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">Avg Raw Score</p>
+    <div class="text-3xl font-black mono text-slate-900">{{ avg_nps }}</div>
+    <p class="text-xs text-slate-400 mt-1">out of 10</p>
+  </div>
+  <div class="bg-white border border-slate-200 rounded-xl p-5">
+    <p class="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">Top Willingness to Pay</p>
+    {% if pay_distribution %}
+      {% set top_pay = pay_distribution | dictsort(by='value') | reverse | first %}
+      <div class="text-3xl font-black mono text-slate-900">{{ top_pay[0] }}</div>
+      <p class="text-xs text-slate-400 mt-1">{{ top_pay[1] }} response{{ 's' if top_pay[1] != 1 else '' }}</p>
+    {% else %}
+      <div class="text-3xl font-black mono text-slate-400">—</div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Charts row -->
+<div class="grid grid-cols-2 gap-4 mb-6">
+
+  <!-- Willingness to Pay chart -->
+  <div class="bg-white border border-slate-200 rounded-xl p-6">
+    <p class="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1">Willingness to Pay</p>
+    <p class="text-sm font-semibold text-slate-900 mb-4">Monthly price distribution</p>
+    <div class="relative" style="height: 220px;">
+      <canvas id="payChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Features chart -->
+  <div class="bg-white border border-slate-200 rounded-xl p-6">
+    <p class="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1">Most Requested Features</p>
+    <p class="text-sm font-semibold text-slate-900 mb-4">Feature demand by selection count</p>
+    <div class="relative" style="height: 220px;">
+      <canvas id="featuresChart"></canvas>
+    </div>
+  </div>
+
+</div>
+
+<!-- NPS Distribution -->
+<div class="bg-white border border-slate-200 rounded-xl p-6 mb-6">
+  <p class="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1">NPS Score Distribution</p>
+  <p class="text-sm font-semibold text-slate-900 mb-4">Response breakdown by score</p>
+  <div class="relative" style="height: 160px;">
+    <canvas id="npsChart"></canvas>
+  </div>
+</div>
+
+<!-- Written Feedback -->
+{% set written = all_feedback | selectattr("feedback_text") | list %}
+{% if written %}
+<div class="bg-white border border-slate-200 rounded-xl p-6 mb-6">
+  <p class="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1">Written Feedback</p>
+  <p class="text-sm font-semibold text-slate-900 mb-5">Open-text responses from beta testers</p>
+  <div class="space-y-3">
+    {% for fb in written %}
+    <div class="border border-slate-100 rounded-lg p-4 bg-slate-50">
+      <div class="flex items-center justify-between mb-2">
+        <div class="flex items-center gap-2">
+          <div class="w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center">
+            <span class="text-xs font-bold text-white">{{ fb.username[0]|upper }}</span>
+          </div>
+          <span class="text-xs font-semibold text-slate-700 mono">{{ fb.username }}</span>
+          <span class="text-xs text-slate-400 bg-white border border-slate-200 px-2 py-0.5 rounded-md">NPS {{ fb.nps_score }}</span>
+        </div>
+        <span class="text-xs text-slate-400">
+          {{ fb.submitted_at.strftime('%b %d, %Y') if fb.submitted_at else '' }}
+        </span>
+      </div>
+      <p class="text-sm text-slate-600 leading-relaxed">{{ fb.feedback_text }}</p>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- Full response table -->
+<div class="bg-white border border-slate-200 rounded-xl p-6">
+  <p class="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1">All Responses</p>
+  <p class="text-sm font-semibold text-slate-900 mb-5">Complete data export</p>
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b border-slate-100">
+          <th class="text-left text-xs font-semibold text-slate-400 uppercase tracking-widest pb-3 pr-4">User</th>
+          <th class="text-left text-xs font-semibold text-slate-400 uppercase tracking-widest pb-3 pr-4">NPS</th>
+          <th class="text-left text-xs font-semibold text-slate-400 uppercase tracking-widest pb-3 pr-4">Willing to Pay</th>
+          <th class="text-left text-xs font-semibold text-slate-400 uppercase tracking-widest pb-3 pr-4">Contact</th>
+          <th class="text-left text-xs font-semibold text-slate-400 uppercase tracking-widest pb-3">Date</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-50">
+        {% for fb in all_feedback %}
+        <tr>
+          <td class="py-3 pr-4 mono text-slate-700 text-xs">{{ fb.username }}</td>
+          <td class="py-3 pr-4">
+            <span class="mono font-bold text-xs px-2 py-1 rounded-md
+              {% if fb.nps_score >= 9 %}bg-emerald-50 text-emerald-700 border border-emerald-200
+              {% elif fb.nps_score >= 7 %}bg-amber-50 text-amber-700 border border-amber-200
+              {% else %}bg-red-50 text-red-700 border border-red-200{% endif %}">
+              {{ fb.nps_score }}
+            </span>
+          </td>
+          <td class="py-3 pr-4 text-xs font-semibold text-slate-700 mono">{{ fb.willing_to_pay }}</td>
+          <td class="py-3 pr-4 text-xs text-slate-500">
+            {% if fb.name or fb.email %}
+              {{ fb.name or '' }}{% if fb.name and fb.email %} &middot; {% endif %}{{ fb.email or '' }}
+            {% else %}
+              <span class="text-slate-300">—</span>
+            {% endif %}
+          </td>
+          <td class="py-3 text-xs text-slate-400">
+            {{ fb.submitted_at.strftime('%b %d') if fb.submitted_at else '—' }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endif %}
+
+<script>
+const tooltipDefaults = {
+  backgroundColor: '#0f172a',
+  titleColor: '#94a3b8',
+  bodyColor: '#f1f5f9',
+  padding: 10,
+  cornerRadius: 8,
+  borderColor: '#1e293b',
+  borderWidth: 1,
+};
+
+{% if total_responses > 0 %}
+
+// Pay chart
+(function() {
+  const payOrder = ['free', '$10', '$25', '$50', '$100+', 'not_sure'];
+  const payLabels = ['Free', '$10/mo', '$25/mo', '$50/mo', '$100+/mo', 'Not sure'];
+  const payDist = {{ pay_distribution | tojson }};
+  const payValues = payOrder.map(k => payDist[k] || 0);
+  const payColors = [
+    '#10b981', // emerald - free
+    '#6366f1', // indigo
+    '#4f46e5',
+    '#4338ca',
+    '#3730a3',
+    '#94a3b8', // slate - not sure
+  ];
+
+  new Chart(document.getElementById('payChart'), {
+    type: 'bar',
+    data: {
+      labels: payLabels,
+      datasets: [{
+        data: payValues,
+        backgroundColor: payColors,
+        borderRadius: 6,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { ...tooltipDefaults }
+      },
+      scales: {
+        x: {
+          grid: { color: '#f1f5f9' },
+          ticks: { color: '#94a3b8', font: { size: 11 }, stepSize: 1 },
+          border: { display: false }
+        },
+        y: {
+          grid: { display: false },
+          ticks: { color: '#475569', font: { size: 11 } },
+          border: { display: false }
+        }
+      }
+    }
+  });
+})();
+
+// Features chart
+(function() {
+  const featDist = {{ feature_counts | tojson }};
+  const featLabels = {
+    'cost_per_feature': 'Cost per feature',
+    'regression_detection': 'Regression detection',
+    'per_commit_comparison': 'Per-commit comparison',
+    'model_cost_breakdown': 'Model cost breakdown',
+    'spend_trends': 'Spend trends',
+    'sdk_integration': 'SDK integration',
+  };
+  const keys = Object.keys(featDist);
+  const labels = keys.map(k => featLabels[k] || k);
+  const values = keys.map(k => featDist[k]);
+
+  new Chart(document.getElementById('featuresChart'), {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        data: values,
+        backgroundColor: '#6366f1',
+        borderRadius: 6,
+        borderSkipped: false,
+        hoverBackgroundColor: '#4f46e5',
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { ...tooltipDefaults }
+      },
+      scales: {
+        x: {
+          grid: { color: '#f1f5f9' },
+          ticks: { color: '#94a3b8', font: { size: 11 }, stepSize: 1 },
+          border: { display: false }
+        },
+        y: {
+          grid: { display: false },
+          ticks: { color: '#475569', font: { size: 11 } },
+          border: { display: false }
+        }
+      }
+    }
+  });
+})();
+
+// NPS distribution chart
+(function() {
+  const npsDist = {{ nps_distribution | tojson }};
+  const labels = Object.keys(npsDist).map(Number).sort((a,b) => a-b);
+  const values = labels.map(k => npsDist[k] || 0);
+  const colors = labels.map(k => {
+    if (k >= 9) return '#10b981';
+    if (k >= 7) return '#f59e0b';
+    return '#ef4444';
+  });
+
+  new Chart(document.getElementById('npsChart'), {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        data: values,
+        backgroundColor: colors,
+        borderRadius: 4,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { ...tooltipDefaults }
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { color: '#475569', font: { size: 12, weight: '600' } },
+          border: { display: false }
+        },
+        y: {
+          grid: { color: '#f1f5f9' },
+          ticks: { color: '#94a3b8', font: { size: 11 }, stepSize: 1 },
+          border: { display: false }
+        }
+      }
+    }
+  });
+})();
+
+{% endif %}
+</script>
+{% endblock %}

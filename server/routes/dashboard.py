@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 import uuid
 import hashlib
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from server.database import get_db
 from server.models import Project, Event
@@ -42,6 +42,19 @@ def dashboard(
 
     recent_events = events_query.order_by(Event.timestamp.desc()).limit(15).all()
 
+    # Week-over-week health indicator
+    now = datetime.now(timezone.utc)
+    seven_ago = (now - timedelta(days=7)).strftime("%Y-%m-%dT00:00:00Z")
+    fourteen_ago = (now - timedelta(days=14)).strftime("%Y-%m-%dT00:00:00Z")
+    this_week_n = events_query.filter(Event.timestamp >= seven_ago).count()
+    last_week_n = events_query.filter(Event.timestamp >= fourteen_ago, Event.timestamp < seven_ago).count()
+    this_week_cost = events_query.filter(Event.timestamp >= seven_ago).with_entities(func.sum(Event.cost_usd)).scalar() or 0.0
+    last_week_cost = events_query.filter(Event.timestamp >= fourteen_ago, Event.timestamp < seven_ago).with_entities(func.sum(Event.cost_usd)).scalar() or 0.0
+    if this_week_n > 0 and last_week_n > 0:
+        wow_change_pct = ((this_week_cost / this_week_n) - (last_week_cost / last_week_n)) / (last_week_cost / last_week_n) * 100
+    else:
+        wow_change_pct = None
+
     commit_rows = (
         db.query(Event.code_version, func.avg(Event.cost_usd).label("avg_cost"))
         .join(Project, Event.project_id == Project.id)
@@ -67,6 +80,7 @@ def dashboard(
             "events": recent_events,
             "chart_data": chart_data,
             "user": current_user,
+            "wow_change_pct": wow_change_pct,
         }
     )
 

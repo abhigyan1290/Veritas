@@ -37,6 +37,37 @@
                 </svg>
                 Overview
             </a>
+
+            <p class="px-3 pt-3 pb-1 text-xs font-semibold text-slate-600 uppercase tracking-widest">Analytics</p>
+
+            <a href="/trends?project_id={{ project_id }}"
+               class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150
+               {% if request.url.path == '/trends' %}bg-slate-800 text-white{% else %}text-slate-400 hover:text-slate-100 hover:bg-slate-800/60{% endif %}">
+                <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                </svg>
+                Spend Trends
+            </a>
+
+            <a href="/analytics/features?project_id={{ project_id }}"
+               class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150
+               {% if request.url.path == '/analytics/features' %}bg-slate-800 text-white{% else %}text-slate-400 hover:text-slate-100 hover:bg-slate-800/60{% endif %}">
+                <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
+                    <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+                </svg>
+                By Feature
+            </a>
+
+            <a href="/analytics/models?project_id={{ project_id }}"
+               class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150
+               {% if request.url.path == '/analytics/models' %}bg-slate-800 text-white{% else %}text-slate-400 hover:text-slate-100 hover:bg-slate-800/60{% endif %}">
+                <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/>
+                </svg>
+                By Model
+            </a>
+
             <a href="/regressions?project_id={{ project_id }}"
                class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150
                {% if request.url.path == '/regressions' %}bg-slate-800 text-white{% else %}text-slate-400 hover:text-slate-100 hover:bg-slate-800/60{% endif %}">
@@ -46,6 +77,18 @@
                 </svg>
                 Change Detection
             </a>
+
+            <div class="border-t border-slate-800 my-2"></div>
+
+            <a href="/feedback?project_id={{ project_id }}"
+               class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150
+               {% if '/feedback' in request.url.path %}bg-slate-800 text-white{% else %}text-slate-400 hover:text-slate-100 hover:bg-slate-800/60{% endif %}">
+                <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+                Feedback
+            </a>
+
             <a href="/settings?project_id={{ project_id }}"
                class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150
                {% if request.url.path == '/settings' %}bg-slate-800 text-white{% else %}text-slate-400 hover:text-slate-100 hover:bg-slate-800/60{% endif %}">

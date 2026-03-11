@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Thank You — Veritas{% endblock %}
+
+{% block content %}
+<div class="max-w-lg mx-auto py-16 text-center">
+  <div class="bg-white border border-slate-200 rounded-2xl p-12 shadow-sm">
+    <div class="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6">
+      <svg class="w-8 h-8 text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20 6 9 17 4 12"/>
+      </svg>
+    </div>
+    <h1 class="text-2xl font-black text-slate-900 tracking-tight mb-3">Thank you for your feedback!</h1>
+    <p class="text-slate-500 text-sm leading-relaxed mb-8">
+      Your input goes directly to the Veritas team and helps us build the product you actually need.
+      We genuinely appreciate you taking the time.
+    </p>
+    <a
+      href="/?project_id={{ project_id }}"
+      class="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl transition-colors"
+    >
+      Back to Dashboard
+      <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="9 18 15 12 9 6"/>
+      </svg>
+    </a>
+  </div>
+</div>
+{% endblock %}

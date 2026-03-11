@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from server.database import engine, Base
-from server.routes import dashboard, ingest, auth
+from server.routes import dashboard, ingest, auth, trends, analytics, feedback
 from server.middleware import SessionMiddleware
 from server.demo_tenant import ensure_demo_tenant
 
@@ -33,6 +33,9 @@ app.add_middleware(SessionMiddleware)
 # Mount routes exactly per Phase 3 spec
 app.include_router(auth.router, tags=["auth"])
 app.include_router(dashboard.router, tags=["dashboard"])
+app.include_router(trends.router, tags=["dashboard"])
+app.include_router(analytics.router, tags=["dashboard"])
+app.include_router(feedback.router, tags=["dashboard"])
 app.include_router(ingest.router, prefix="/api/v1", tags=["api"])
 
 @app.get("/health")
