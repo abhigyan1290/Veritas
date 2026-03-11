@@ -3,6 +3,9 @@ import os
 import string
 import random
 import requests
+from dotenv import load_dotenv
+
+load_dotenv()  # Read VERITAS_ADMIN_SECRET and VERITAS_BASE_URL from .env
 
 # Config - these can be overridden via environment variables
 BASE_URL = os.environ.get("VERITAS_BASE_URL", "https://web-production-82424.up.railway.app")
