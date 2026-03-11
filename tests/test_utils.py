@@ -4,11 +4,11 @@ import re
 
 import pytest
 
-from veritas.utils import get_git_commit_hash, utc_now_iso
+from veritas.utils import get_current_commit_hash, utc_now_iso
 
 
-class TestGetGitCommitHash:
-    """Tests for get_git_commit_hash."""
+class TestGetCurrentCommitHash:
+    """Tests for get_current_commit_hash."""
 
     def test_returns_hash_when_git_available(self, monkeypatch):
         """Returns commit hash when git succeeds."""
@@ -20,7 +20,7 @@ class TestGetGitCommitHash:
             return Result()
 
         monkeypatch.setattr("veritas.utils.subprocess.run", mock_run)
-        assert get_git_commit_hash() == "a81cd29"
+        assert get_current_commit_hash() == "a81cd29"
 
     def test_returns_none_when_not_in_repo(self, monkeypatch):
         """Returns None when not in a git repo."""
@@ -32,7 +32,7 @@ class TestGetGitCommitHash:
             return Result()
 
         monkeypatch.setattr("veritas.utils.subprocess.run", mock_run)
-        assert get_git_commit_hash() is None
+        assert get_current_commit_hash() == "unknown"
 
     def test_returns_none_when_git_not_found(self, monkeypatch):
         """Returns None when git command not found."""
@@ -41,7 +41,7 @@ class TestGetGitCommitHash:
             raise FileNotFoundError()
 
         monkeypatch.setattr("veritas.utils.subprocess.run", mock_run)
-        assert get_git_commit_hash() is None
+        assert get_current_commit_hash() == "unknown"
 
 
 class TestUtcNowIso:

@@ -6,6 +6,11 @@ import hashlib
 from server.models import Project, Event, User
 from server.auth_users import hash_password
 
+def generate_demo_traffic(db, project_id: str):
+    """Stub — demo traffic generation removed per user request."""
+    pass
+
+
 DEMO_USERNAME = "admin"
 DEMO_PASSWORD = os.environ.get("VERITAS_DEMO_PASS", "claudecode")
 

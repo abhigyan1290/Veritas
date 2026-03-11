@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:smith.langchain.com)",
+      "WebFetch(domain:braintrust.dev)",
+      "WebFetch(domain:openmeter.io)",
+      "WebSearch"
+    ]
+  }
+}
