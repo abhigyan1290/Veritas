@@ -207,9 +207,18 @@ def form_create_project(
 ):
     from server.routes.ingest import create_project
     from server.schemas import ProjectCreateSchema
+    from fastapi import HTTPException
     
     current_user = request.state.current_user
-    result = create_project(ProjectCreateSchema(name=project_name), db=db, user_id=current_user.id)
+    try:
+        result = create_project(ProjectCreateSchema(name=project_name), db=db, user_id=current_user.id)
+    except HTTPException as e:
+        # Redirect back with a user-friendly error (e.g. duplicate project name)
+        from urllib.parse import quote
+        return RedirectResponse(
+            url=f"/settings?error={quote(e.detail)}",
+            status_code=303
+        )
     
     return RedirectResponse(
         url=f"/settings?project_id={result['id']}&raw_key={result['raw_key']}", 

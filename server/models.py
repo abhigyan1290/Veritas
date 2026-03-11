@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text
 from sqlalchemy.orm import relationship
 import uuid
 from datetime import datetime, timezone
@@ -45,3 +45,15 @@ class Event(Base):
     timestamp = Column(String, index=True)
     status = Column(String, default="ok")
     estimated = Column(Boolean, default=False)
+
+class Feedback(Base):
+    __tablename__ = "feedback"
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, nullable=False)
+    nps_score = Column(Integer, nullable=False)
+    willing_to_pay = Column(String, nullable=False)
+    valuable_features = Column(Text, nullable=True)
+    feedback_text = Column(Text, nullable=True)
+    name = Column(String, nullable=True)
+    email = Column(String, nullable=True)
+    submitted_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))

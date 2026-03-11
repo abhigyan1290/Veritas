@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% block title %}By Model — Veritas{% endblock %}
+
+{% block content %}
+
+<!-- Page header -->
+<div class="mb-6">
+    <h1 class="text-xl font-bold text-slate-900">By Model</h1>
+    <p class="text-sm text-slate-400 mt-0.5">Understand which AI models are driving your costs</p>
+</div>
+
+{% if model_rows %}
+
+<!-- Two-column layout: table (2/3) + donut chart (1/3) -->
+<div class="grid grid-cols-3 gap-5">
+
+    <!-- Ranked table -->
+    <div class="col-span-2 bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <div class="px-5 py-4 border-b border-slate-100">
+            <h2 class="text-sm font-semibold text-slate-900">Model Breakdown</h2>
+            <p class="text-xs text-slate-400 mt-0.5">All models used in this project, sorted by spend</p>
+        </div>
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="bg-slate-50/60 border-b border-slate-100">
+                    <th class="text-xs font-semibold text-slate-400 uppercase tracking-widest px-5 py-3 text-left">Model</th>
+                    <th class="text-xs font-semibold text-slate-400 uppercase tracking-widest px-4 py-3 text-right">Total Spend</th>
+                    <th class="text-xs font-semibold text-slate-400 uppercase tracking-widest px-4 py-3 text-right">API Calls</th>
+                    <th class="text-xs font-semibold text-slate-400 uppercase tracking-widest px-4 py-3 text-right">Avg Cost/Call</th>
+                    <th class="text-xs font-semibold text-slate-400 uppercase tracking-widest px-4 py-3 text-right">Tokens In</th>
+                    <th class="text-xs font-semibold text-slate-400 uppercase tracking-widest px-5 py-3 text-right">Tokens Out</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                {% for row in model_rows %}
+                <tr class="hover:bg-slate-50/60 transition-colors">
+                    <!-- Model badge -->
+                    <td class="px-5 py-3.5">
+                        <div class="flex items-center gap-2">
+                            <span class="inline-block w-2 h-2 rounded-full shrink-0"
+                                  style="background-color: {{ ['rgba(99,102,241,0.8)', 'rgba(139,92,246,0.8)', 'rgba(14,165,233,0.8)', 'rgba(16,185,129,0.8)', 'rgba(245,158,11,0.8)', 'rgba(239,68,68,0.8)'][loop.index0 % 6] }};"></span>
+                            <span class="text-xs mono bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-medium">{{ row.model }}</span>
+                        </div>
+                    </td>
+
+                    <!-- Total spend -->
+                    <td class="px-4 py-3.5 text-right">
+                        <span class="text-sm font-bold mono text-slate-900">${{ "%.5f"|format(row.total_cost) }}</span>
+                    </td>
+
+                    <!-- API calls -->
+                    <td class="px-4 py-3.5 text-right">
+                        <span class="text-sm mono text-slate-700">{{ "{:,}".format(row.call_count) }}</span>
+                    </td>
+
+                    <!-- Avg cost/call -->
+                    <td class="px-4 py-3.5 text-right">
+                        <span class="text-sm mono text-slate-700">${{ "%.5f"|format(row.avg_cost_per_call) }}</span>
+                    </td>
+
+                    <!-- Tokens in -->
+                    <td class="px-4 py-3.5 text-right">
+                        <span class="text-sm mono text-slate-500">{{ "{:,}".format(row.total_tokens_in) }}</span>
+                    </td>
+
+                    <!-- Tokens out -->
+                    <td class="px-5 py-3.5 text-right">
+                        <span class="text-sm mono text-slate-500">{{ "{:,}".format(row.total_tokens_out) }}</span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <!-- Table footer totals -->
+        <div class="px-5 py-3 bg-slate-50/60 border-t border-slate-100 flex items-center justify-between">
+            <span class="text-xs font-semibold text-slate-400 uppercase tracking-widest">Total</span>
+            <div class="flex items-center gap-8">
+                <span class="text-xs mono font-bold text-slate-900">${{ "%.5f"|format(model_rows|sum(attribute='total_cost')) }}</span>
+                <span class="text-xs mono text-slate-500">{{ "{:,}".format(model_rows|sum(attribute='call_count')) }} calls</span>
+                <span class="text-xs mono text-slate-400">{{ "{:,}".format(model_rows|sum(attribute='total_tokens_in')) }} in</span>
+                <span class="text-xs mono text-slate-400">{{ "{:,}".format(model_rows|sum(attribute='total_tokens_out')) }} out</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Donut chart -->
+    <div class="col-span-1 bg-white border border-slate-200 rounded-xl overflow-hidden flex flex-col">
+        <div class="px-5 py-4 border-b border-slate-100 shrink-0">
+            <h2 class="text-sm font-semibold text-slate-900">Spend Distribution</h2>
+            <p class="text-xs text-slate-400 mt-0.5">Cost share by model</p>
+        </div>
+        <div class="flex-1 p-5 flex items-center justify-center">
+            <div class="w-full" style="max-width: 280px;">
+                <canvas id="modelDonut"></canvas>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+(function() {
+    const labels = {{ chart_labels_json | safe }};
+    const values = {{ chart_values_json | safe }};
+    if (!labels || labels.length === 0) return;
+
+    const ctx = document.getElementById('modelDonut');
+    if (!ctx) return;
+
+    const COLORS = [
+        'rgba(99,102,241,0.8)',
+        'rgba(139,92,246,0.8)',
+        'rgba(14,165,233,0.8)',
+        'rgba(16,185,129,0.8)',
+        'rgba(245,158,11,0.8)',
+        'rgba(239,68,68,0.8)'
+    ];
+
+    const backgroundColors = labels.map((_, i) => COLORS[i % COLORS.length]);
+
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: values,
+                backgroundColor: backgroundColors,
+                borderColor: 'white',
+                borderWidth: 2,
+                hoverOffset: 4,
+            }]
+        },
+        options: {
+            cutout: '65%',
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        color: '#64748b',
+                        font: { size: 11, family: 'JetBrains Mono' },
+                        padding: 16,
+                        boxWidth: 10,
+                        boxHeight: 10,
+                    }
+                },
+                tooltip: {
+                    backgroundColor: '#0f172a',
+                    titleColor: '#94a3b8',
+                    bodyColor: '#f1f5f9',
+                    callbacks: {
+                        label: ctx => ' $' + ctx.parsed.toFixed(5)
+                    }
+                }
+            }
+        }
+    });
+})();
+</script>
+
+{% else %}
+<!-- Empty state -->
+<div class="bg-white border border-slate-200 rounded-xl flex flex-col items-center justify-center py-24 text-center px-6">
+    <div class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mb-4">
+        <svg class="w-6 h-6 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="9"/>
+            <path d="M12 3v9l4.5 4.5"/>
+        </svg>
+    </div>
+    <p class="text-sm font-semibold text-slate-700">No model data yet</p>
+    <p class="text-xs text-slate-400 mt-1.5 max-w-xs">Integrate the Veritas SDK and send events with a <span class="mono bg-slate-100 px-1 py-0.5 rounded text-slate-600">model</span> field to see cost breakdown here.</p>
+</div>
+{% endif %}
+
+{% endblock %}

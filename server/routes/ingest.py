@@ -64,8 +64,22 @@ def create_project(data: ProjectCreateSchema, db: Session = Depends(get_db), use
     """
     Create a new project workspace and generate an API key.
     Returns the raw API key EXACTLY ONCE.
+    
+    Project IDs are UUIDs — globally unique and collision-proof.
+    Within a single user's account, project names must be unique.
+    Across different users, identical names are allowed.
     """
-    project_id = data.name.lower().replace(" ", "_")
+    # Check that THIS user doesn't already have a project with this name
+    if user_id:
+        existing = db.query(Project).filter(
+            Project.user_id == user_id,
+            Project.name == data.name
+        ).first()
+        if existing:
+            raise HTTPException(status_code=400, detail=f"You already have a project named '{data.name}'")
+    
+    # Use a UUID as the stable internal ID — never derived from the name
+    project_id = str(uuid.uuid4())
     
     # Generate a secure API Key
     raw_api_key = f"sk-vrt-{uuid.uuid4().hex}"
@@ -85,7 +99,7 @@ def create_project(data: ProjectCreateSchema, db: Session = Depends(get_db), use
         db.refresh(db_project)
     except Exception:
         db.rollback()
-        raise HTTPException(status_code=400, detail="Project already exists")
+        raise HTTPException(status_code=500, detail="Failed to create project")
         
     return {
         "id": db_project.id,
