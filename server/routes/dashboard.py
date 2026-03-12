@@ -9,7 +9,6 @@ from datetime import datetime, timezone, timedelta
 
 from server.database import get_db
 from server.models import Project, Event
-from server.demo_tenant import ensure_demo_tenant
 import json
 from typing import Optional
 
@@ -25,7 +24,6 @@ def dashboard(
     project_id: str = "demo",
     db: Session = Depends(get_db)
 ):
-    ensure_demo_tenant(db)
     current_user = request.state.current_user
         
     projects = get_projects(db, current_user.id)

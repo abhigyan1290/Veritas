@@ -1,3 +1,4 @@
+import os
 from fastapi import APIRouter, Depends, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -7,6 +8,8 @@ import json
 
 from server.database import get_db
 from server.models import Feedback, Project
+
+_ADMIN_USERNAME = os.environ.get("VERITAS_ADMIN_USERNAME", "admin")
 
 router = APIRouter()
 templates = Jinja2Templates(directory="server/templates")
@@ -51,6 +54,9 @@ def feedback_submit(
 ):
     current_user = request.state.current_user
 
+    # Clamp NPS to valid range — never let out-of-range values corrupt aggregate metrics
+    nps_score = max(1, min(10, nps_score))
+
     existing = db.query(Feedback).filter(Feedback.username == current_user.username).first()
     if not existing:
         entry = Feedback(
@@ -90,7 +96,7 @@ def feedback_thanks(request: Request, db: Session = Depends(get_db)):
 def feedback_results(request: Request, db: Session = Depends(get_db)):
     current_user = request.state.current_user
 
-    if current_user.username != "admin":
+    if current_user.username != _ADMIN_USERNAME:
         return RedirectResponse(url="/", status_code=303)
 
     projects = get_projects_for_user(db, current_user.id)

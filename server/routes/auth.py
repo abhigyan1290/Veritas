@@ -8,6 +8,7 @@ import os
 from server.database import get_db
 from server.models import User
 from server.auth_users import hash_password, verify_password, create_session_token
+from server.limiter import limiter
 
 router = APIRouter()
 templates = Jinja2Templates(directory="server/templates")
@@ -22,7 +23,8 @@ def login_page(request: Request, error: str = None):
     return templates.TemplateResponse("login.html", {"request": request, "error": error})
 
 @router.post("/auth/login")
-def login(response: Response, username: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def login(request: Request, response: Response, username: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == username).first()
     if not user or not verify_password(password, user.password_hash):
         return RedirectResponse(url="/auth/login?error=Invalid+credentials", status_code=303)

@@ -3,6 +3,9 @@ from server.database import engine, Base
 from server.routes import dashboard, ingest, auth, trends, analytics, feedback
 from server.middleware import SessionMiddleware
 from server.demo_tenant import ensure_demo_tenant
+from server.limiter import limiter
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 import time
 import os
@@ -28,6 +31,8 @@ for i in range(5):
 
 app = FastAPI(title="Veritas Cloud Backend")
 
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SessionMiddleware)
 
 # Mount routes exactly per Phase 3 spec

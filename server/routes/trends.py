@@ -39,11 +39,12 @@ def trends(request: Request):
             for i in range(30)
         ]
 
-        # Fetch all events in the window for the selected project
+        # Fetch all events in the window — JOIN through Project to enforce ownership
         if project_id:
             all_events = (
                 db.query(Event)
-                .filter(Event.project_id == project_id)
+                .join(Project, Event.project_id == Project.id)
+                .filter(Project.user_id == current_user.id, Event.project_id == project_id)
                 .all()
             )
             events_30d = [

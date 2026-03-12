@@ -4,7 +4,11 @@
       "WebFetch(domain:smith.langchain.com)",
       "WebFetch(domain:braintrust.dev)",
       "WebFetch(domain:openmeter.io)",
-      "WebSearch"
+      "WebSearch",
+      "WebFetch(domain:www.helicone.ai)",
+      "WebFetch(domain:www.braintrust.dev)",
+      "WebFetch(domain:portkey.ai)",
+      "WebFetch(domain:langfuse.com)"
     ]
   }
 }
