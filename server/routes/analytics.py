@@ -1,7 +1,7 @@
 import json
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func
 
@@ -32,30 +32,33 @@ def analytics_features(request: Request):
         total_project_cost = 0.0
 
         if project_id:
-            # Total project cost for share calculation
-            total_project_cost = db.query(
-                func.coalesce(func.sum(Event.cost_usd), 0.0)
-            ).filter(Event.project_id == project_id).scalar() or 0.0
+            # All event queries join through Project to enforce ownership
+            owned_events = (
+                db.query(Event)
+                .join(Project, Event.project_id == Project.id)
+                .filter(Project.user_id == current_user.id, Event.project_id == project_id)
+            )
 
-            # Group by feature
+            total_project_cost = owned_events.with_entities(
+                func.coalesce(func.sum(Event.cost_usd), 0.0)
+            ).scalar() or 0.0
+
             rows = (
-                db.query(
+                owned_events.with_entities(
                     Event.feature,
                     func.coalesce(func.sum(Event.cost_usd), 0.0).label("total_cost"),
                     func.count(Event.id).label("call_count"),
                     func.coalesce(func.avg(Event.latency_ms), 0.0).label("avg_latency_ms"),
                     func.coalesce(func.sum(Event.tokens_in + Event.tokens_out), 0).label("total_tokens"),
                 )
-                .filter(Event.project_id == project_id)
                 .group_by(Event.feature)
                 .order_by(func.sum(Event.cost_usd).desc())
                 .all()
             )
 
-            # Error counts per feature (separate query)
             error_counts_raw = (
-                db.query(Event.feature, func.count(Event.id).label("error_count"))
-                .filter(Event.project_id == project_id, Event.status != "ok")
+                owned_events.with_entities(Event.feature, func.count(Event.id).label("error_count"))
+                .filter(Event.status != "ok")
                 .group_by(Event.feature)
                 .all()
             )
@@ -110,15 +113,20 @@ def analytics_models(request: Request):
         chart_values = []
 
         if project_id:
+            # JOIN through Project to enforce ownership
+            owned_events = (
+                db.query(Event)
+                .join(Project, Event.project_id == Project.id)
+                .filter(Project.user_id == current_user.id, Event.project_id == project_id)
+            )
             rows = (
-                db.query(
+                owned_events.with_entities(
                     Event.model,
                     func.coalesce(func.sum(Event.cost_usd), 0.0).label("total_cost"),
                     func.count(Event.id).label("call_count"),
                     func.coalesce(func.sum(Event.tokens_in), 0).label("total_tokens_in"),
                     func.coalesce(func.sum(Event.tokens_out), 0).label("total_tokens_out"),
                 )
-                .filter(Event.project_id == project_id)
                 .group_by(Event.model)
                 .order_by(func.sum(Event.cost_usd).desc())
                 .all()

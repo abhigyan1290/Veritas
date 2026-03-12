@@ -34,6 +34,7 @@ Streaming (async):
 Note: stream_options is injected automatically and transparently.
       The caller's code does not change at all.
 """
+import asyncio
 import time
 
 from veritas.client import _emit_event, _get_commit
@@ -127,7 +128,7 @@ class _CompletionsProxy:
 
         response = await self._original_completions.create(*args, **kwargs)
         latency_ms = (time.time() - start_time) * 1000
-        _track_from_completion(response, self._feature_name, model, latency_ms, commit)
+        await asyncio.to_thread(_track_from_completion, response, self._feature_name, model, latency_ms, commit)
         return response
 
 
@@ -196,7 +197,8 @@ class _OpenAIAsyncStream:
                 tokens_in = getattr(usage, "prompt_tokens", 0) or 0
                 tokens_out = getattr(usage, "completion_tokens", 0) or 0
             yield chunk
-        _emit_event(
+        await asyncio.to_thread(
+            _emit_event,
             feature_name=self._feature_name,
             model=self._model,
             tokens_in=tokens_in,

@@ -1,6 +1,6 @@
 """Veritas — AI cost attribution and change detection."""
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 from veritas.core import CostEvent, track, set_default_sink, get_default_sink
 from veritas.sinks import BaseSink, ConsoleSink, SQLiteSink, HttpSink

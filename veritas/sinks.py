@@ -4,7 +4,7 @@ import json
 import sqlite3
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional, Union
 
 if TYPE_CHECKING:
     from veritas.core import CostEvent
@@ -50,7 +50,7 @@ class ConsoleSink(BaseSink):
 class SQLiteSink(BaseSink):
     """Sink that persists cost events to a local SQLite database."""
 
-    def __init__(self, path: str | Path | None = None):
+    def __init__(self, path: Optional[Union[str, Path]] = None):
         """Initialize the sink with a DB path.
 
         Args:
@@ -99,7 +99,7 @@ class SQLiteSink(BaseSink):
         self._conn.commit()
 
     def get_events(
-        self, feature: str, commit: str | None = None, since_iso: str | None = None
+        self, feature: str, commit: Optional[str] = None, since_iso: Optional[str] = None
     ) -> list[dict]:
         # TODO: Extract this into a dedicated Read/Storage Model later
         """Fetch events for a feature. Allows filtering by commit hash or ISO timestamp."""

@@ -1,0 +1,19 @@
+name: Backup main branch
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push to backup branch
+        run: |
+          git push origin HEAD:refs/heads/main-backup --force

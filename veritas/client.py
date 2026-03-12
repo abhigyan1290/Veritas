@@ -5,6 +5,7 @@ These classes are drop-in replacements that intercept every API call,
 capture cost/latency/token metrics, and emit a CostEvent — silently.
 The host application's code never changes.
 """
+import asyncio
 import time
 from datetime import datetime, timezone
 
@@ -133,7 +134,8 @@ class _AnthropicMessagesProxy:
 
         response = await self._original_messages.create(*args, **kwargs)
         latency_ms = (time.time() - start_time) * 1000
-        self._track_from_response(response, kwargs.get("model", "unknown"), latency_ms, commit)
+        # Push the blocking HTTP emit off the event loop
+        await asyncio.to_thread(self._track_from_response, response, kwargs.get("model", "unknown"), latency_ms, commit)
         return response
 
     def _track_from_response(self, response, model: str, latency_ms: float, commit: str):
@@ -221,7 +223,9 @@ class _AnthropicAsyncStream:
                 if usage:
                     tokens_out = getattr(usage, "output_tokens", 0)
             yield event
-        _emit_event(
+        # Push the blocking HTTP emit off the event loop
+        await asyncio.to_thread(
+            _emit_event,
             feature_name=self._feature_name,
             model=self._model,
             tokens_in=tokens_in,
