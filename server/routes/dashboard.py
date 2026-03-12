@@ -3,6 +3,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+import time
 import uuid
 import hashlib
 from datetime import datetime, timezone, timedelta
@@ -14,6 +15,25 @@ from typing import Optional
 
 router = APIRouter()
 templates = Jinja2Templates(directory="server/templates")
+
+# Simple in-memory cache for expensive aggregate stats (60s TTL).
+# Keyed by project_id. Prevents re-running full-table aggregations on every page load.
+_stats_cache: dict = {}
+_STATS_TTL = 60  # seconds
+
+
+def _get_cached_stats(project_id: str, events_query):
+    entry = _stats_cache.get(project_id)
+    if entry and (time.time() - entry["ts"]) < _STATS_TTL:
+        return entry["data"]
+    data = {
+        "total_events": events_query.count(),
+        "total_cost":   events_query.with_entities(func.sum(Event.cost_usd)).scalar() or 0.0,
+        "total_tokens": events_query.with_entities(func.sum(Event.tokens_in + Event.tokens_out)).scalar() or 0,
+        "avg_latency":  events_query.with_entities(func.avg(Event.latency_ms)).scalar() or 0.0,
+    }
+    _stats_cache[project_id] = {"data": data, "ts": time.time()}
+    return data
 
 def get_projects(db: Session, user_id: str):
     return db.query(Project).filter(Project.user_id == user_id).all()
@@ -33,10 +53,11 @@ def dashboard(
         .join(Project, Event.project_id == Project.id)
         .filter(Project.user_id == current_user.id, Event.project_id == project_id)
     )
-    total_events = events_query.count()
-    total_cost = events_query.with_entities(func.sum(Event.cost_usd)).scalar() or 0.0
-    total_tokens = events_query.with_entities(func.sum(Event.tokens_in + Event.tokens_out)).scalar() or 0
-    avg_latency = events_query.with_entities(func.avg(Event.latency_ms)).scalar() or 0.0
+    stats = _get_cached_stats(project_id, events_query)
+    total_events = stats["total_events"]
+    total_cost   = stats["total_cost"]
+    total_tokens = stats["total_tokens"]
+    avg_latency  = stats["avg_latency"]
 
     recent_events = events_query.order_by(Event.timestamp.desc()).limit(15).all()
 
@@ -138,45 +159,44 @@ def regressions(
     insights = []
     
     if len(commits) >= 2:
-        previous = commits[-2]   # second-most-recent commit
-        latest = commits[-1]     # most recent commit
-        
-        features = [r[0] for r in (
-            db.query(Event.feature)
+        previous = commits[-2]
+        latest   = commits[-1]
+
+        # Single query for both commits — replaces N*2 per-feature queries
+        avg_rows = (
+            db.query(Event.feature, Event.code_version, func.avg(Event.cost_usd).label("avg_cost"))
             .join(Project, Event.project_id == Project.id)
-            .filter(Project.user_id == current_user.id, Event.project_id == project_id)
-            .distinct()
+            .filter(
+                Project.user_id == current_user.id,
+                Event.project_id == project_id,
+                Event.code_version.in_([previous, latest]),
+            )
+            .group_by(Event.feature, Event.code_version)
             .all()
-        )]
-        
+        )
+
+        # Index results by (feature, commit) for O(1) lookup
+        avg_map: dict = {}
+        for row in avg_rows:
+            avg_map[(row.feature, row.code_version)] = row.avg_cost or 0.0
+
+        features = {row.feature for row in avg_rows}
         for feature in features:
-            latest_avg = (
-                db.query(func.avg(Event.cost_usd))
-                .join(Project, Event.project_id == Project.id)
-                .filter(Project.user_id == current_user.id, Event.project_id == project_id, Event.code_version == latest, Event.feature == feature)
-                .scalar() or 0.0
-            )
-            prev_avg = (
-                db.query(func.avg(Event.cost_usd))
-                .join(Project, Event.project_id == Project.id)
-                .filter(Project.user_id == current_user.id, Event.project_id == project_id, Event.code_version == previous, Event.feature == feature)
-                .scalar() or 0.0
-            )
-            
-            diff = latest_avg - prev_avg
-            diff_pct = ((diff / prev_avg) * 100) if prev_avg > 0 else 0
-            
-            # Show all features, not just expensive regressions
+            latest_avg = avg_map.get((feature, latest), 0.0)
+            prev_avg   = avg_map.get((feature, previous), 0.0)
+            diff       = latest_avg - prev_avg
+            diff_pct   = ((diff / prev_avg) * 100) if prev_avg > 0 else 0
+
             if latest_avg > 0 or prev_avg > 0:
                 insights.append({
-                    "feature": feature,
-                    "prev_commit": previous,
+                    "feature":       feature,
+                    "prev_commit":   previous,
                     "latest_commit": latest,
-                    "prev_val": prev_avg,
-                    "latest_val": latest_avg,
-                    "diff": diff,
-                    "diff_pct": diff_pct,
-                    "is_regression": diff > 0
+                    "prev_val":      prev_avg,
+                    "latest_val":    latest_avg,
+                    "diff":          diff,
+                    "diff_pct":      diff_pct,
+                    "is_regression": diff > 0,
                 })
 
     return templates.TemplateResponse(

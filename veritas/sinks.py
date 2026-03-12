@@ -1,7 +1,9 @@
 """Output destinations for cost events."""
 
 import json
+import queue
 import sqlite3
+import threading
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional, Union
@@ -50,6 +52,8 @@ class ConsoleSink(BaseSink):
 class SQLiteSink(BaseSink):
     """Sink that persists cost events to a local SQLite database."""
 
+    BATCH_SIZE = 25  # commit every N inserts to avoid per-write fsync overhead
+
     def __init__(self, path: Optional[Union[str, Path]] = None):
         """Initialize the sink with a DB path.
 
@@ -63,13 +67,28 @@ class SQLiteSink(BaseSink):
             self._path = os.environ.get("VERITAS_DB_PATH", "veritas_events.db")
         else:
             self._path = str(path)
-            
-        self._conn = sqlite3.connect(self._path)
+
+        self._conn = sqlite3.connect(self._path, check_same_thread=False)
+
+        # WAL mode allows readers and the writer to coexist without blocking
+        # each other, and makes individual writes significantly faster because
+        # SQLite no longer needs to fsync the main database file on every commit.
+        if self._path != ":memory:":
+            self._conn.execute("PRAGMA journal_mode=WAL")
+            # NORMAL is safe (no data loss on OS crash; only on power loss) and
+            # much faster than the default FULL fsync.
+            self._conn.execute("PRAGMA synchronous=NORMAL")
+
         self._conn.execute(EVENTS_SCHEMA)
         self._conn.commit()
+        self._pending = 0  # count of uncommitted inserts
 
     def emit(self, event: "CostEvent") -> None:
-        """Insert the event as a row in the events table."""
+        """Insert the event as a row in the events table.
+
+        Commits are batched every BATCH_SIZE events to avoid an fsync on every
+        single insert. The last batch is committed when close() is called.
+        """
         data = event.to_dict()
         # SQLite uses 0/1 for booleans
         data["estimated"] = 1 if data["estimated"] else 0
@@ -96,7 +115,10 @@ class SQLiteSink(BaseSink):
                 data["estimated"],
             ),
         )
-        self._conn.commit()
+        self._pending += 1
+        if self._pending >= self.BATCH_SIZE:
+            self._conn.commit()
+            self._pending = 0
 
     def get_events(
         self, feature: str, commit: Optional[str] = None, since_iso: Optional[str] = None
@@ -127,33 +149,61 @@ class SQLiteSink(BaseSink):
         return [dict(row) for row in rows]
 
     def close(self) -> None:
-        """Close the database connection. Call when done emitting events."""
+        """Flush any pending batch and close the database connection."""
+        if self._pending > 0:
+            self._conn.commit()
+            self._pending = 0
         self._conn.close()
 
 
 class HttpSink(BaseSink):
-    """Sink that transmits cost events via HTTP POST to a centralized Veritas server."""
-    
+    """Sink that transmits cost events via HTTP POST to a centralized Veritas server.
+
+    emit() is non-blocking: events are placed on an in-process queue and sent
+    in the background by a daemon thread, so the host application never waits
+    on network I/O. Events are sent individually (matching the existing server
+    endpoint) with a short timeout. If the queue is full or the request fails
+    the event is silently dropped — telemetry must never crash the host app.
+    """
+
+    # Maximum events to hold in memory before dropping new ones.
+    QUEUE_MAXSIZE = 1000
+
     def __init__(self, endpoint_url: str, api_key: str):
         self.endpoint_url = endpoint_url
         self.api_key = api_key
-        # We use a memory buffer to batch events in real production,
-        # but for this demo phase we dispatch synchronously to prove flow.
+
         import requests
         self._session = requests.Session()
         self._session.headers.update({
             "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
         })
-        
+
+        self._queue: queue.Queue = queue.Queue(maxsize=self.QUEUE_MAXSIZE)
+
+        # Daemon thread so it never prevents the process from exiting.
+        self._thread = threading.Thread(target=self._flush_loop, daemon=True)
+        self._thread.start()
+
     def emit(self, event: "CostEvent") -> None:
-        """Send the event directly to the centralized server."""
+        """Enqueue the event for background dispatch. Never blocks the caller."""
         try:
-            response = self._session.post(
-                self.endpoint_url, 
-                json=event.to_dict(), 
-                timeout=2.0
-            )
-        except Exception:
-            # Fail silently — never crash the host application due to telemetry errors.
+            self._queue.put_nowait(event.to_dict())
+        except queue.Full:
+            # Queue is full — drop the event rather than blocking the host app.
             pass
+
+    def _flush_loop(self) -> None:
+        """Background thread: drain the queue and POST events to the server."""
+        while True:
+            try:
+                payload = self._queue.get()  # blocks until an event is available
+                self._session.post(
+                    self.endpoint_url,
+                    json=payload,
+                    timeout=5.0,
+                )
+            except Exception:
+                # Fail silently — never crash the host application.
+                pass
