@@ -19,6 +19,7 @@ class TestGetCurrentCommitHash:
                 stderr = ""
             return Result()
 
+        monkeypatch.setattr("veritas.utils._commit_cache", None)
         monkeypatch.setattr("veritas.utils.subprocess.run", mock_run)
         assert get_current_commit_hash() == "a81cd29"
 
@@ -31,6 +32,7 @@ class TestGetCurrentCommitHash:
                 stderr = "fatal: not a git repository"
             return Result()
 
+        monkeypatch.setattr("veritas.utils._commit_cache", None)
         monkeypatch.setattr("veritas.utils.subprocess.run", mock_run)
         assert get_current_commit_hash() == "unknown"
 
@@ -40,6 +42,7 @@ class TestGetCurrentCommitHash:
         def mock_run(*args, **kwargs):
             raise FileNotFoundError()
 
+        monkeypatch.setattr("veritas.utils._commit_cache", None)
         monkeypatch.setattr("veritas.utils.subprocess.run", mock_run)
         assert get_current_commit_hash() == "unknown"
 
