@@ -25,7 +25,7 @@ class TestTrackDecorator:
         """Decorator emits event with correct fields when function succeeds."""
         sink = InMemorySink()
 
-        @track(feature="chat_search", sink=sink)
+        @track(feature="chat_search", sink=sink, tags={"user_tier": "premium"})
         def call_api():
             # Fake Anthropic-style response
             resp = MagicMock()
@@ -51,6 +51,7 @@ class TestTrackDecorator:
         assert event.status == "ok"
         assert event.latency_ms >= 0
         assert event.cost_usd > 0
+        assert event.tags == {"user_tier": "premium"}
 
     def test_extracts_from_dict_style_response(self):
         """Extractor handles dict-style usage (e.g. OpenAI compatibility)."""

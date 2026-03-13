@@ -18,6 +18,7 @@ def test_cost_event_creation():
         cost_usd=0.00102,
         code_version="a81cd29",
         timestamp="2026-03-06T19:02:11Z",
+        tags={"tenant": "acme"},
     )
     assert event.feature == "chat_search"
     assert event.model == "claude-opus-4"
@@ -27,6 +28,7 @@ def test_cost_event_creation():
     assert event.cache_read_tokens == 50
     assert event.status == "ok"
     assert event.estimated is False
+    assert event.tags == {"tenant": "acme"}
 
 
 def test_cost_event_to_dict():
@@ -44,6 +46,7 @@ def test_cost_event_to_dict():
         timestamp="2026-03-06T12:00:00Z",
         status="ok",
         estimated=True,
+        tags={"env": "prod"},
     )
     d = event.to_dict()
     assert d["feature"] == "test"
@@ -58,6 +61,7 @@ def test_cost_event_to_dict():
     assert d["timestamp"] == "2026-03-06T12:00:00Z"
     assert d["status"] == "ok"
     assert d["estimated"] is True
+    assert d["tags"] == {"env": "prod"}
     assert set(d.keys()) == {
         "feature",
         "model",
@@ -71,6 +75,7 @@ def test_cost_event_to_dict():
         "timestamp",
         "status",
         "estimated",
+        "tags",
     }
 
 

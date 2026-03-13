@@ -41,7 +41,7 @@ class Event(Base):
     cache_read_tokens = Column(Integer, default=0)
     latency_ms = Column(Float)
     cost_usd = Column(Float)
-    code_version = Column(String)
+    code_version = Column(String, index=True)
     timestamp = Column(String, index=True)
     status = Column(String, default="ok")
     estimated = Column(Boolean, default=False)

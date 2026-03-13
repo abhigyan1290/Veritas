@@ -26,6 +26,7 @@ def _make_event(**overrides) -> CostEvent:
         "timestamp": "2026-03-06T12:00:00Z",
         "status": "ok",
         "estimated": False,
+        "tags": {"default": "tag"},
     }
     defaults.update(overrides)
     return CostEvent(**defaults)
@@ -135,6 +136,7 @@ class TestSQLiteSink:
                 timestamp="2026-03-06T19:02:11Z",
                 status="ok",
                 estimated=True,
+                tags={"doc_type": "pdf", "pages": "100"},
             )
             sink.emit(event)
             sink.close()
@@ -158,6 +160,7 @@ class TestSQLiteSink:
             assert row[10] == "2026-03-06T19:02:11Z"
             assert row[11] == "ok"
             assert row[12] == 1  # estimated stored as 1
+            assert json.loads(row[13]) == {"doc_type": "pdf", "pages": "100"}
         finally:
             Path(path).unlink(missing_ok=True)
 

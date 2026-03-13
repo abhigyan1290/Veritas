@@ -61,7 +61,11 @@ def _emit_event(
 
 
 def _get_commit() -> str:
-    """Resolve the current git commit hash safely."""
+    """Resolve the current git commit hash safely.
+
+    Delegates to ``get_current_commit_hash()`` which handles overrides,
+    env vars, caching, fast-path resolution, and dirty detection.
+    """
     try:
         from veritas.utils import get_current_commit_hash
         return get_current_commit_hash()

@@ -26,9 +26,16 @@ CREATE TABLE IF NOT EXISTS events (
     code_version TEXT,
     timestamp TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'ok',
-    estimated INTEGER NOT NULL DEFAULT 0
+    estimated INTEGER NOT NULL DEFAULT 0,
+    tags TEXT
 );
 """
+
+# Index on code_version speeds up compare_commits / dashboard GROUP BY queries.
+EVENTS_INDEX = """
+CREATE INDEX IF NOT EXISTS idx_events_code_version ON events(code_version);
+"""
+
 
 
 class BaseSink(ABC):
@@ -80,6 +87,7 @@ class SQLiteSink(BaseSink):
             self._conn.execute("PRAGMA synchronous=NORMAL")
 
         self._conn.execute(EVENTS_SCHEMA)
+        self._conn.execute(EVENTS_INDEX)
         self._conn.commit()
         self._pending = 0  # count of uncommitted inserts
 
@@ -97,8 +105,8 @@ class SQLiteSink(BaseSink):
             """
             INSERT INTO events (
                 feature, model, tokens_in, tokens_out, cache_creation_tokens, cache_read_tokens, latency_ms,
-                cost_usd, code_version, timestamp, status, estimated
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                cost_usd, code_version, timestamp, status, estimated, tags
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 data["feature"],
@@ -113,6 +121,7 @@ class SQLiteSink(BaseSink):
                 data["timestamp"],
                 data["status"],
                 data["estimated"],
+                json.dumps(data.get("tags", {})),
             ),
         )
         self._pending += 1
