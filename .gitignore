@@ -3,6 +3,7 @@
 .env.local
 .anthropic_key
 *.key
+.claude
 secrets.env
 
 # Python

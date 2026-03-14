@@ -124,6 +124,53 @@ def test_compare_commits_includes_dirty_when_requested():
 # New tests for tag filtering
 # ─────────────────────────────────────────────────────────────────────────────
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Guard: "unknown" commit hashes
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_compare_commits_raises_for_unknown_commit_a():
+    """compare_commits raises before querying sink when commit_a is 'unknown'.
+
+    The critical case: events ARE stored with code_version='unknown' (Docker/CI
+    without VERITAS_CODE_VERSION set), but comparing them is meaningless.
+    The guard must fire BEFORE the sink query, not fall through to "No data".
+    """
+    data = [
+        # Events recorded with unknown version — common in un-configured deployments
+        {"feature": "search", "code_version": "unknown", "cost_usd": 0.05,
+         "tokens_in": 10, "tokens_out": 10, "latency_ms": 1},
+        {"feature": "search", "code_version": "abc123456789", "cost_usd": 0.05,
+         "tokens_in": 10, "tokens_out": 10, "latency_ms": 1},
+    ]
+    sink = MockSink(data)
+    with pytest.raises(ValueError, match="VERITAS_CODE_VERSION"):
+        compare_commits(sink, "search", "unknown", "abc123456789")
+
+
+def test_compare_commits_raises_for_unknown_commit_b():
+    """compare_commits raises before querying sink when commit_b is 'unknown'."""
+    data = [
+        {"feature": "search", "code_version": "unknown", "cost_usd": 0.08,
+         "tokens_in": 10, "tokens_out": 10, "latency_ms": 1},
+        {"feature": "search", "code_version": "abc123456789", "cost_usd": 0.05,
+         "tokens_in": 10, "tokens_out": 10, "latency_ms": 1},
+    ]
+    sink = MockSink(data)
+    with pytest.raises(ValueError, match="VERITAS_CODE_VERSION"):
+        compare_commits(sink, "search", "abc123456789", "unknown")
+
+
+def test_compare_commits_raises_for_both_unknown():
+    """compare_commits raises when both commits are 'unknown' — not silent garbage."""
+    data = [
+        {"feature": "search", "code_version": "unknown", "cost_usd": 0.05,
+         "tokens_in": 10, "tokens_out": 10, "latency_ms": 1},
+    ]
+    sink = MockSink(data)
+    with pytest.raises(ValueError, match="VERITAS_CODE_VERSION"):
+        compare_commits(sink, "search", "unknown", "unknown")
+
+
 from veritas.engine import filter_events_by_tags
 
 def test_filter_events_by_tags_empty():

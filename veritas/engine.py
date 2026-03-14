@@ -95,6 +95,13 @@ def compare_commits(
         dict containing the computed averages for both commits, the deltas,
         and whether a regression was detected.
     """
+    if commit_a == "unknown" or commit_b == "unknown":
+        raise ValueError(
+            f"Cannot compare commits: commit_{'a' if commit_a == 'unknown' else 'b'} is 'unknown'. "
+            "Git version could not be resolved. Set the VERITAS_CODE_VERSION environment variable "
+            "to the deployed commit SHA, or pass code_version to veritas.init()."
+        )
+
     events_a = sink.get_events(feature, commit=commit_a)
     events_b = sink.get_events(feature, commit=commit_b)
 

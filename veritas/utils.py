@@ -10,7 +10,9 @@ from pathlib import Path
 logger = logging.getLogger("veritas")
 
 # Regex for a valid short/full git hash, optionally with +dirty suffix.
-_HASH_RE = re.compile(r"^[0-9a-f]{7,40}(\+dirty)?$")
+# Minimum 12 chars: 7-char hashes have ~1-in-268M collision probability on large
+# repos; 12 chars gives ~1-in-281T, essentially negligible.
+_HASH_RE = re.compile(r"^[0-9a-f]{12,40}(\+dirty)?$")
 
 # Module-level cache: commit hash is resolved once per process lifetime.
 # The hash cannot change while the process is running, so repeated subprocess
@@ -24,6 +26,29 @@ _commit_override: str | None = None
 def _is_valid_hash(value: str) -> bool:
     """Check whether *value* looks like a plausible git hash (with optional +dirty)."""
     return bool(_HASH_RE.match(value))
+
+
+def _read_packed_ref(git_dir: Path, ref_name: str) -> str | None:
+    """Read a commit hash from .git/packed-refs for the given ref name.
+
+    packed-refs format (one ref per line):
+        <full-hash> <ref-name>
+    Lines starting with '#' are comments; lines starting with '^' are peeled tags.
+    Returns the full hash string, or None if the ref is not found.
+    """
+    packed_refs_path = git_dir / "packed-refs"
+    if not packed_refs_path.is_file():
+        return None
+    try:
+        for line in packed_refs_path.read_text().splitlines():
+            if line.startswith("#") or line.startswith("^") or not line.strip():
+                continue
+            parts = line.split(" ", 1)
+            if len(parts) == 2 and parts[1].strip() == ref_name:
+                return parts[0].strip()
+    except (OSError, ValueError):
+        pass
+    return None
 
 
 def _resolve_from_dotgit() -> str | None:
@@ -66,16 +91,21 @@ def _resolve_from_dotgit() -> str | None:
 
         if head_content.startswith("ref:"):
             # Symbolic ref — resolve it
-            ref_path = git_dir / head_content.split(":", 1)[1].strip()
-            if not ref_path.is_file():
-                return None  # packed refs — fall back to subprocess
-            full_hash = ref_path.read_text().strip()
+            ref_name = head_content.split(":", 1)[1].strip()  # e.g. "refs/heads/main"
+            ref_path = git_dir / ref_name
+            if ref_path.is_file():
+                full_hash = ref_path.read_text().strip()
+            else:
+                # Loose ref missing — try packed-refs (common after git gc / CI clones)
+                full_hash = _read_packed_ref(git_dir, ref_name)
+                if full_hash is None:
+                    return None  # ref not found anywhere — fall back to subprocess
         else:
             # Detached HEAD — content is the full hash
             full_hash = head_content
 
-        if len(full_hash) >= 7 and all(c in "0123456789abcdef" for c in full_hash):
-            return full_hash[:7]
+        if len(full_hash) >= 12 and all(c in "0123456789abcdef" for c in full_hash):
+            return full_hash[:12]
 
         return None
     except (OSError, ValueError):
@@ -83,16 +113,25 @@ def _resolve_from_dotgit() -> str | None:
 
 
 def _check_dirty() -> bool:
-    """Return True if the working tree has uncommitted changes."""
+    """Return True if the working tree has uncommitted changes.
+
+    Uses ``git status --porcelain`` which catches:
+    - Modified tracked files (``git diff HEAD`` also catches these)
+    - Staged but uncommitted changes
+    - Untracked files (``git diff HEAD`` misses these)
+    - Works correctly on unborn HEAD (empty repo) — exits 0 with empty output
+      whereas ``git diff HEAD`` exits 128 on an unborn HEAD, which would be
+      incorrectly interpreted as dirty.
+    """
     try:
         result = subprocess.run(
-            ["git", "diff", "--quiet", "HEAD"],
+            ["git", "status", "--porcelain"],
             capture_output=True,
             text=True,
             timeout=5,
         )
-        # returncode 0 = clean, 1 = dirty
-        return result.returncode != 0
+        # Any output means there are changes; empty output means clean
+        return bool(result.stdout.strip())
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
         return False  # if we can't tell, assume clean
 
@@ -101,7 +140,7 @@ def _resolve_via_subprocess() -> str | None:
     """Resolve the commit hash by shelling out to git. Returns 7-char hash or None."""
     try:
         result = subprocess.run(
-            ["git", "rev-parse", "--short=7", "HEAD"],
+            ["git", "rev-parse", "--short=12", "HEAD"],
             capture_output=True,
             text=True,
             timeout=5,
@@ -139,6 +178,13 @@ def get_current_commit_hash() -> str:
     # 2-3. Environment variable overrides (checked every call for test flexibility)
     env_override = os.environ.get("VERITAS_CODE_VERSION") or os.environ.get("VERITAS_MOCK_COMMIT")
     if env_override:
+        if not _is_valid_hash(env_override):
+            logger.warning(
+                "veritas: VERITAS_CODE_VERSION=%r does not look like a git commit hash "
+                "(expected 7-40 lowercase hex chars). Events will be stored with this value "
+                "as code_version, but git-hash-based queries in compare_commits may not match.",
+                env_override,
+            )
         return env_override
 
     # 4. Return cached value if already resolved

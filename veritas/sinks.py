@@ -1,6 +1,7 @@
 """Output destinations for cost events."""
 
 import json
+import logging
 import queue
 import sqlite3
 import threading
@@ -8,8 +9,15 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional, Union
 
+try:
+    import requests as requests
+except ImportError:
+    requests = None  # type: ignore[assignment]
+
 if TYPE_CHECKING:
     from veritas.core import CostEvent
+
+logger = logging.getLogger("veritas")
 
 # Schema for the events table. Matches CostEvent fields for change detection queries.
 EVENTS_SCHEMA = """
@@ -41,6 +49,17 @@ CREATE INDEX IF NOT EXISTS idx_events_code_version ON events(code_version);
 class BaseSink(ABC):
     """Abstract sink for emitting cost events."""
 
+    def _check_version(self, event: "CostEvent") -> None:
+        """Warn if code_version is 'unknown' — events won't be attributable to a deployment."""
+        if event.code_version == "unknown":
+            logger.warning(
+                "veritas: emitting event for feature %r with code_version='unknown'. "
+                "Events cannot be attributed to a specific deployment. "
+                "Set the VERITAS_CODE_VERSION environment variable to the deployed commit SHA, "
+                "or pass code_version to veritas.init().",
+                event.feature,
+            )
+
     @abstractmethod
     def emit(self, event: "CostEvent") -> None:
         """Emit a cost event to the sink's destination."""
@@ -52,6 +71,7 @@ class ConsoleSink(BaseSink):
 
     def emit(self, event: "CostEvent") -> None:
         """Print the event as a single JSON line to stdout."""
+        self._check_version(event)
         data = event.to_dict()
         print(json.dumps(data))
 
@@ -97,6 +117,7 @@ class SQLiteSink(BaseSink):
         Commits are batched every BATCH_SIZE events to avoid an fsync on every
         single insert. The last batch is committed when close() is called.
         """
+        self._check_version(event)
         data = event.to_dict()
         # SQLite uses 0/1 for booleans
         data["estimated"] = 1 if data["estimated"] else 0
@@ -182,7 +203,10 @@ class HttpSink(BaseSink):
         self.endpoint_url = endpoint_url
         self.api_key = api_key
 
-        import requests
+        if requests is None:
+            raise ImportError(
+                "veritas: 'requests' is required for HttpSink. Install it with: pip install requests"
+            )
         self._session = requests.Session()
         self._session.headers.update({
             "Authorization": f"Bearer {self.api_key}",
@@ -197,11 +221,19 @@ class HttpSink(BaseSink):
 
     def emit(self, event: "CostEvent") -> None:
         """Enqueue the event for background dispatch. Never blocks the caller."""
+        self._check_version(event)
         try:
             self._queue.put_nowait(event.to_dict())
         except queue.Full:
-            # Queue is full — drop the event rather than blocking the host app.
-            pass
+            # Queue is full — drop the event rather than blocking the host app,
+            # but log so operators know attribution data is being lost.
+            logger.warning(
+                "veritas: HttpSink queue full (%d/%d) — dropping event for feature %r. "
+                "Consider increasing QUEUE_MAXSIZE or reducing emit frequency.",
+                self._queue.qsize(),
+                self.QUEUE_MAXSIZE,
+                event.feature,
+            )
 
     def _flush_loop(self) -> None:
         """Background thread: drain the queue and POST events to the server."""
