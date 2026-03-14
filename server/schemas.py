@@ -11,7 +11,7 @@ class CostEventSchema(BaseModel):
     cache_read_tokens:     int   = 0
     latency_ms:            float
     cost_usd:              float
-    code_version:          Optional[str] = Field(None, max_length=200)
+    code_version:          Optional[str] = Field(None, max_length=50, pattern=r"^[0-9a-f]{7,40}(\+dirty)?$|^unknown$")
     timestamp:             str   = Field(..., max_length=50)
     status:                str   = Field("ok", max_length=50)
     estimated:             bool  = False

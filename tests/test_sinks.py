@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from veritas.core import CostEvent
-from veritas.sinks import BaseSink, ConsoleSink, SQLiteSink
+from veritas.sinks import BaseSink, ConsoleSink, HttpSink, SQLiteSink
 
 
 def _make_event(**overrides) -> CostEvent:
@@ -26,6 +26,7 @@ def _make_event(**overrides) -> CostEvent:
         "timestamp": "2026-03-06T12:00:00Z",
         "status": "ok",
         "estimated": False,
+        "tags": {"default": "tag"},
     }
     defaults.update(overrides)
     return CostEvent(**defaults)
@@ -135,6 +136,7 @@ class TestSQLiteSink:
                 timestamp="2026-03-06T19:02:11Z",
                 status="ok",
                 estimated=True,
+                tags={"doc_type": "pdf", "pages": "100"},
             )
             sink.emit(event)
             sink.close()
@@ -158,6 +160,7 @@ class TestSQLiteSink:
             assert row[10] == "2026-03-06T19:02:11Z"
             assert row[11] == "ok"
             assert row[12] == 1  # estimated stored as 1
+            assert json.loads(row[13]) == {"doc_type": "pdf", "pages": "100"}
         finally:
             Path(path).unlink(missing_ok=True)
 
@@ -228,6 +231,81 @@ class TestSQLiteSink:
     def test_sqlite_sink_is_base_sink(self):
         """SQLiteSink is a subclass of BaseSink."""
         assert issubclass(SQLiteSink, BaseSink)
+
+
+class TestUnknownVersionWarning:
+    """Sinks must warn when code_version is 'unknown' so operators notice misconfiguration."""
+
+    def test_sqlite_sink_warns_on_unknown_code_version(self, caplog):
+        """SQLiteSink logs a warning when emitting an event with code_version='unknown'."""
+        import logging
+        sink = SQLiteSink(":memory:")
+        event = _make_event(code_version="unknown")
+        with caplog.at_level(logging.WARNING, logger="veritas"):
+            sink.emit(event)
+        assert any("unknown" in r.message and "VERITAS_CODE_VERSION" in r.message
+                   for r in caplog.records), "Expected warning mentioning unknown and VERITAS_CODE_VERSION"
+
+    def test_console_sink_warns_on_unknown_code_version(self, caplog):
+        """ConsoleSink logs a warning when emitting an event with code_version='unknown'."""
+        import logging
+        sink = ConsoleSink()
+        event = _make_event(code_version="unknown")
+        with caplog.at_level(logging.WARNING, logger="veritas"):
+            sink.emit(event)
+        assert any("unknown" in r.message and "VERITAS_CODE_VERSION" in r.message
+                   for r in caplog.records)
+
+    def test_no_warning_for_known_code_version(self, caplog):
+        """No warning emitted when code_version is a real git hash."""
+        import logging
+        sink = SQLiteSink(":memory:")
+        event = _make_event(code_version="abc123456789")
+        with caplog.at_level(logging.WARNING, logger="veritas"):
+            sink.emit(event)
+        assert not any("VERITAS_CODE_VERSION" in r.message for r in caplog.records)
+
+
+class TestHttpSinkDropLogging:
+    """HttpSink must log a warning when the queue is full and events are dropped,
+    so operators know they're losing attribution data (not just silently missing it)."""
+
+    def test_logs_warning_when_queue_full(self, caplog):
+        """Emitting to a full queue logs a WARNING instead of silently dropping."""
+        import logging
+        import unittest.mock as mock
+
+        # Patch requests.Session so no real HTTP calls are made
+        with mock.patch("veritas.sinks.requests") as mock_requests:
+            mock_requests.Session.return_value = mock.MagicMock()
+            sink = HttpSink(endpoint_url="http://fake", api_key="test-key")
+            # Fill the queue to capacity
+            sink._queue.maxsize = 3
+            for _ in range(3):
+                sink._queue.put_nowait({"dummy": True})
+
+            event = _make_event(feature="overflow_feature")
+            with caplog.at_level(logging.WARNING, logger="veritas"):
+                sink.emit(event)
+
+        assert any(
+            "dropped" in r.message.lower() or "overflow_feature" in r.message
+            for r in caplog.records
+        ), f"Expected drop warning, got: {[r.message for r in caplog.records]}"
+
+    def test_no_warning_when_queue_has_space(self, caplog):
+        """No warning when the queue accepts the event normally."""
+        import logging
+        import unittest.mock as mock
+
+        with mock.patch("veritas.sinks.requests") as mock_requests:
+            mock_requests.Session.return_value = mock.MagicMock()
+            sink = HttpSink(endpoint_url="http://fake", api_key="test-key")
+            event = _make_event()
+            with caplog.at_level(logging.WARNING, logger="veritas"):
+                sink.emit(event)
+
+        assert not any("dropped" in r.message.lower() for r in caplog.records)
 
 
 class TestBaseSink:
