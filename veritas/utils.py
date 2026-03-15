@@ -122,8 +122,29 @@ def _check_dirty() -> bool:
     - Works correctly on unborn HEAD (empty repo) — exits 0 with empty output
       whereas ``git diff HEAD`` exits 128 on an unborn HEAD, which would be
       incorrectly interpreted as dirty.
+
+    Note: on some platforms (notably Windows), when HEAD is only resolvable via
+    packed-refs and the git subprocess cannot resolve it (exits 128), ``git status
+    --porcelain`` may report all tracked files as staged-new (``A  <file>``) against
+    an apparent empty tree. This is a false positive: if HEAD cannot be resolved by
+    the subprocess, the status output is unreliable and we return False.
     """
     try:
+        # First verify HEAD is resolvable by the git subprocess. If it isn't
+        # (exit code 128 = ambiguous / unknown), the working tree status output
+        # from git status --porcelain will be unreliable (shows all files as
+        # staged vs empty tree). In that case we cannot determine dirty state.
+        verify = subprocess.run(
+            ["git", "rev-parse", "--verify", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if verify.returncode == 128:
+            # HEAD is not resolvable by the subprocess (e.g. packed-refs only on
+            # Windows, or detached in an unusual state). Assume clean.
+            return False
+
         result = subprocess.run(
             ["git", "status", "--porcelain"],
             capture_output=True,
