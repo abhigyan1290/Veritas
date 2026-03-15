@@ -55,7 +55,7 @@ def _resolve_from_dotgit() -> str | None:
     """Try to read the commit hash directly from .git/HEAD + ref files.
 
     This avoids spawning a subprocess for the common case (a normal checkout).
-    Returns the 7-char shortened hash, or None if it cannot be resolved this way.
+    Returns the 12-char shortened hash, or None if it cannot be resolved this way.
     """
     try:
         # Walk up from cwd looking for a .git directory
@@ -158,7 +158,7 @@ def _check_dirty() -> bool:
 
 
 def _resolve_via_subprocess() -> str | None:
-    """Resolve the commit hash by shelling out to git. Returns 7-char hash or None."""
+    """Resolve the commit hash by shelling out to git. Returns 12-char hash or None."""
     try:
         result = subprocess.run(
             ["git", "rev-parse", "--short=12", "HEAD"],
@@ -182,7 +182,7 @@ def get_current_commit_hash() -> str:
       3. ``VERITAS_MOCK_COMMIT`` environment variable (deprecated alias).
       4. Cached value from a previous call.
       5. Fast-path: read ``.git/HEAD`` directly (no subprocess).
-      6. Fallback: ``git rev-parse --short=7 HEAD`` subprocess.
+      6. Fallback: ``git rev-parse --short=12 HEAD`` subprocess.
 
     If the working tree has uncommitted changes, ``+dirty`` is appended
     (e.g. ``abc1234+dirty``).

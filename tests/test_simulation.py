@@ -224,7 +224,7 @@ def test_edge_unborn_head(tmp_path, monkeypatch):
     reset_commit_cache()
 
 
-def test_edge_compare_commits_unknown_raises(tmp_path, monkeypatch):
+def test_edge_compare_commits_unknown_raises():
     """compare_commits raises ValueError before querying sink when either commit is 'unknown'."""
     sink = SQLiteSink(":memory:")
     # Even if events exist with code_version='unknown', the guard fires first
@@ -240,7 +240,7 @@ def test_edge_compare_commits_unknown_raises(tmp_path, monkeypatch):
     sink.close()
 
 
-def test_edge_compare_commits_no_events_raises(tmp_path):
+def test_edge_compare_commits_no_events_raises():
     """compare_commits raises ValueError when valid hash has no events (distinct from 'unknown' guard)."""
     sink = SQLiteSink(":memory:")
     # Only commit_a has events; commit_b has none
