@@ -15,6 +15,8 @@ installed and the server is running.
 """
 
 import os
+import shutil
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -194,7 +196,7 @@ def phase_summary_header():
 
 
 def phase_summary_row(phase: str, summary: dict, regression: bool | None = None):
-    reg_str = "—" if regression is None else ("YES" if regression else "NO")
+    reg_str = "-" if regression is None else ("YES" if regression else "NO")
     print(
         f"{phase:<10} {summary['code_version']:<22} {summary['n_calls']:>6}"
         f"  ${summary['avg_cost']:>9.6f}  {reg_str}"
@@ -297,7 +299,6 @@ if __name__ == "__main__":
         phase_summary_row("v0.5", summaries["v0.5"], regression=False)
 
         # ── Verify count ─────────────────────────────────────────────────────
-        import sqlite3
         conn = sqlite3.connect(str(ROOT / "simulation.db"))
         count = conn.execute(
             "SELECT COUNT(*) FROM events WHERE code_version = ?", (scale_version,)
@@ -314,6 +315,5 @@ if __name__ == "__main__":
         raise
     finally:
         os.chdir(original_cwd)
-        import shutil
         shutil.rmtree(tmp_dir, ignore_errors=True)
         print(f"\n[sim] Cleaned up temp repo. Results saved to simulation.db")
