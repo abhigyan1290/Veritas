@@ -140,7 +140,7 @@ def _check_dirty() -> bool:
             text=True,
             timeout=5,
         )
-        if verify.returncode == 128:
+        if verify.returncode != 0:
             # HEAD is not resolvable by the subprocess (e.g. packed-refs only on
             # Windows, or detached in an unusual state). Assume clean.
             return False

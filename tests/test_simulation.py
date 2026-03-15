@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 
 from veritas.core import CostEvent
-from veritas.engine import compare_commits
+from veritas.engine import compare_commits, REGRESSION_ABSOLUTE_THRESHOLD_USD, REGRESSION_PERCENT_THRESHOLD
 from veritas.sinks import SQLiteSink
 from veritas.utils import get_current_commit_hash, reset_commit_cache, utc_now_iso
 from veritas.utils import _check_dirty  # internal, used for edge-case assertions
@@ -32,8 +32,11 @@ def _git(args: list[str], cwd: Path) -> str:
         cwd=cwd,
         capture_output=True,
         text=True,
-        check=True,
     )
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"git {args} failed (exit {result.returncode}):\n{result.stderr.strip()}"
+        )
     return result.stdout.strip()
 
 
@@ -82,6 +85,7 @@ def test_helpers_smoke(tmp_path, monkeypatch):
     reset_commit_cache()
 
     hash_ = make_commit(repo, "hello.py", "print('hi')", "feat: hello")
+    reset_commit_cache()  # consistent with stated invariant
     assert len(hash_) >= 12
     assert all(c in "0123456789abcdef" for c in hash_)
 
@@ -146,6 +150,9 @@ def test_phase_v02_dirty_detection(tmp_path, monkeypatch):
     sink = SQLiteSink(":memory:")
     for _ in range(10):
         make_event(sink, dirty_hash, cost_usd=0.001)
+
+    dirty_rows = sink.get_events("search", commit=dirty_hash)
+    assert len(dirty_rows) == 10, "dirty events should be stored with +dirty suffix"
 
     # --- Commit the change — dirty suffix should clear ---
     _git(["add", "."], repo)
@@ -226,6 +233,7 @@ def test_edge_unborn_head(tmp_path, monkeypatch):
 
 def test_edge_compare_commits_unknown_raises():
     """compare_commits raises ValueError before querying sink when either commit is 'unknown'."""
+    reset_commit_cache()
     sink = SQLiteSink(":memory:")
     # Even if events exist with code_version='unknown', the guard fires first
     make_event(sink, "unknown", 0.05)
@@ -238,6 +246,7 @@ def test_edge_compare_commits_unknown_raises():
         compare_commits(sink, "search", "abc123456789", "unknown")
 
     sink.close()
+    reset_commit_cache()
 
 
 def test_edge_compare_commits_no_events_raises():
@@ -286,8 +295,8 @@ def test_phase_v03_regression_and_v04_hotfix(tmp_path, monkeypatch):
     result_03 = compare_commits(sink, "search", v02_hash, v03_hash)
     assert result_03["is_regression"] is True, \
         f"expected regression, got: {result_03}"
-    assert result_03["delta_cost_usd"] > 0.01   # absolute threshold
-    assert result_03["percent_change"] > 0.10   # percent threshold
+    assert result_03["delta_cost_usd"] > REGRESSION_ABSOLUTE_THRESHOLD_USD
+    assert result_03["percent_change"] > REGRESSION_PERCENT_THRESHOLD
     assert result_03["commit_a_stats"]["count"] == 20
     assert result_03["commit_b_stats"]["count"] == 30
 
@@ -327,7 +336,8 @@ def test_phase_v05_scale_load(monkeypatch):
     for i in range(205):
         make_event(sink, synthetic_version, cost_usd=0.001)
 
-    # Flush remainder (5 events) via close() — verifies no crash
+    # Verify 5 pending events remain before close() flushes them (205 % 25 = 5)
+    assert sink._pending == 5, f"expected 5 pending before close(), got {sink._pending}"
     sink.close()
     reset_commit_cache()
 
