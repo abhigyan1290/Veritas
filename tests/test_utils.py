@@ -305,6 +305,13 @@ class TestHashLength:
         _reset_all(monkeypatch)
 
         def mock_run(cmd, **kwargs):
+            if "--verify" in cmd:
+                # _check_dirty() preflight: HEAD is resolvable
+                class VerifyResult:
+                    returncode = 0
+                    stdout = ""
+                    stderr = ""
+                return VerifyResult()
             if "rev-parse" in cmd:
                 assert "--short=12" in cmd, f"Expected --short=12 in {cmd}"
                 class Result:
@@ -372,6 +379,13 @@ class TestDirtyDetectionV2:
         'git diff --quiet HEAD' misses these; 'git status --porcelain' catches them.
         """
         def mock_run(cmd, **kwargs):
+            if "--verify" in cmd:
+                # preflight: HEAD is resolvable — fall through to status check
+                class VerifyResult:
+                    returncode = 0
+                    stdout = ""
+                    stderr = ""
+                return VerifyResult()
             assert "status" in cmd, "Must call git status, not git diff"
             class Result:
                 returncode = 0
