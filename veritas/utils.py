@@ -9,9 +9,6 @@ from pathlib import Path
 
 logger = logging.getLogger("veritas")
 
-# Regex for a valid short/full git hash, optionally with +dirty suffix.
-# Minimum 12 chars: 7-char hashes have ~1-in-268M collision probability on large
-# repos; 12 chars gives ~1-in-281T, essentially negligible.
 _HASH_RE = re.compile(r"^[0-9a-f]{12,40}(\+dirty)?$")
 
 # Module-level cache: commit hash is resolved once per process lifetime.
