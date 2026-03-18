@@ -6,6 +6,19 @@
 .claude
 secrets.env
 
+# Superpowers / internal tooling
+.superpowers/
+docs/superpowers/
+docs/plans/
+docs/INTERNAL_ROADMAP.md
+OPTIMIZATIONS.md
+
+# Dev scripts and benchmarks
+scripts/
+
+# GitHub internal workflows
+.github/
+
 # Python
 __pycache__/
 *.py[cod]
