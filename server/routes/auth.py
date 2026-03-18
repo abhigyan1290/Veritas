@@ -16,7 +16,7 @@ templates = Jinja2Templates(directory="server/templates")
 # Secret used to authorize the invite creation script
 ADMIN_SECRET = os.environ.get("VERITAS_ADMIN_SECRET", "local-admin-secret")
 
-ALLOW_SIGNUPS = os.environ.get("ALLOW_SIGNUPS", "false").lower() == "true"
+ALLOW_SIGNUPS = os.environ.get("ALLOW_SIGNUPS", "true").lower() == "true"
 
 @router.get("/auth/login", response_class=HTMLResponse)
 def login_page(request: Request, error: str = None):
