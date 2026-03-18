@@ -16,8 +16,6 @@ templates = Jinja2Templates(directory="server/templates")
 # Secret used to authorize the invite creation script
 ADMIN_SECRET = os.environ.get("VERITAS_ADMIN_SECRET", "local-admin-secret")
 
-ALLOW_SIGNUPS = os.environ.get("ALLOW_SIGNUPS", "true").lower() == "true"
-
 @router.get("/auth/login", response_class=HTMLResponse)
 def login_page(request: Request, error: str = None):
     return templates.TemplateResponse("login.html", {"request": request, "error": error})
@@ -28,7 +26,7 @@ def login(request: Request, response: Response, username: str = Form(...), passw
     user = db.query(User).filter(User.username == username).first()
     if not user or not verify_password(password, user.password_hash):
         return RedirectResponse(url="/auth/login?error=Invalid+credentials", status_code=303)
-        
+
     token = create_session_token(user.id)
     resp = RedirectResponse(url="/", status_code=303)
     resp.set_cookie(key="veritas_session", value=token, httponly=True, max_age=7*24*3600, samesite="lax")
@@ -36,16 +34,10 @@ def login(request: Request, response: Response, username: str = Form(...), passw
 
 @router.get("/auth/signup", response_class=HTMLResponse)
 def signup_page(request: Request, error: str = None):
-    return templates.TemplateResponse(
-        "signup.html", 
-        {"request": request, "error": error, "allow_signups": ALLOW_SIGNUPS}
-    )
+    return templates.TemplateResponse("signup.html", {"request": request, "error": error})
 
 @router.post("/auth/signup")
 def signup(response: Response, username: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
-    if not ALLOW_SIGNUPS:
-        return RedirectResponse(url="/auth/signup?error=Signups+are+invite-only", status_code=303)
-        
     existing_user = db.query(User).filter(User.username == username).first()
     if existing_user:
         return RedirectResponse(url="/auth/signup?error=Username+already+exists", status_code=303)
